@@ -17,6 +17,7 @@ import type {
   ExtensionChange,
   ExtensionsView,
   RewriteRule,
+  RulePreview,
   RewriteView,
   FeedbackInput,
   FeedbackResult,
@@ -390,7 +391,7 @@ export function installExtension(packId: string, enable = false): Promise<Extens
 }
 
 /** The rules a rule pack would add, read from the verified archive; installs nothing. */
-export function previewExtensionRules(packId: string): Promise<RewriteRule[]> {
+export function previewExtensionRules(packId: string): Promise<RulePreview> {
   return call("extension_preview_rules", { packId });
 }
 

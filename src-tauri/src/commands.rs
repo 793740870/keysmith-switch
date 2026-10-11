@@ -2117,11 +2117,12 @@ pub async fn extension_uninstall(
 }
 
 /// The rules a rule pack would add, so the person can read them before installing.
+/// An opaque pack returns a count and an empty list.
 #[tauri::command(rename_all = "camelCase")]
 pub async fn extension_preview_rules(
     app: tauri::AppHandle,
     pack_id: String,
-) -> Result<Vec<keysmith_rewrite::Rule>> {
+) -> Result<crate::extensions::RulePreview> {
     blocking(app, move |state| {
         require_extensions(state)?;
         Ok(crate::extensions::preview_rules(

@@ -261,7 +261,7 @@ describe("ExtensionsPage", () => {
   it("shows a rule pack's rules before installing, then installs and turns it on", async () => {
     const rules = { ...base, id: "x.rules", kind: "rules" as const, name: "规则", tools: ["codex" as const] };
     extensionsState.mockResolvedValue(view([rules]));
-    previewExtensionRules.mockResolvedValue([{ from: "foo", to: "bar" }]);
+    previewExtensionRules.mockResolvedValue({ opaque: false, count: 1, rules: [{ from: "foo", to: "bar" }] });
     installExtension.mockResolvedValue({
       view: view([{ ...rules, installedVersion: "0.1.0" }]),
       report: { added: 1, updated: 0, copied: 0, linked: 0, kept: 0, removed: 0 },
@@ -280,7 +280,7 @@ describe("ExtensionsPage", () => {
   it("can install a rule pack without turning it on", async () => {
     const rules = { ...base, id: "x.rules", kind: "rules" as const, tools: ["codex" as const] };
     extensionsState.mockResolvedValue(view([rules]));
-    previewExtensionRules.mockResolvedValue([{ from: "foo", to: "" }]);
+    previewExtensionRules.mockResolvedValue({ opaque: false, count: 1, rules: [{ from: "foo", to: "" }] });
     installExtension.mockResolvedValue({
       view: view([{ ...rules, installedVersion: "0.1.0" }]),
       report: { added: 1, updated: 0, copied: 0, linked: 0, kept: 0, removed: 0 },
@@ -290,5 +290,24 @@ describe("ExtensionsPage", () => {
     await screen.findByTestId("extensions-rules-preview");
     fireEvent.click(screen.getByTestId("extensions-rules-install-only"));
     await waitFor(() => expect(installExtension).toHaveBeenCalledWith("x.rules", false));
+  });
+
+  it("installs a sealed rule pack from a count, without showing from or to", async () => {
+    const rules = { ...base, id: "x.sealed", kind: "rules" as const, name: "密封", tools: ["codex" as const], opaque: true };
+    extensionsState.mockResolvedValue(view([rules]));
+    previewExtensionRules.mockResolvedValue({ opaque: true, count: 12, rules: [] });
+    installExtension.mockResolvedValue({
+      view: view([{ ...rules, installedVersion: "0.1.0" }]),
+      report: { added: 12, updated: 0, copied: 0, linked: 0, kept: 0, removed: 0 },
+    });
+    renderPage(true);
+    const button = await screen.findByTestId("extension-install-x.sealed");
+    expect(button).toHaveTextContent("安装");
+    fireEvent.click(button);
+    expect(await screen.findByTestId("extensions-rules-preview-sealed")).toHaveTextContent("12 条");
+    expect(screen.queryByTestId("extensions-rules-preview")).not.toBeInTheDocument();
+    expect(screen.getByRole("dialog")).not.toHaveTextContent("foo");
+    fireEvent.click(screen.getByTestId("extensions-rules-install-enable"));
+    await waitFor(() => expect(installExtension).toHaveBeenCalledWith("x.sealed", true));
   });
 });

@@ -6,7 +6,7 @@ use crate::error::{Error, Result};
 use crate::models::now_rfc3339;
 use crate::paths::AppPaths;
 
-pub const SCHEMA_VERSION: i64 = 3;
+pub const SCHEMA_VERSION: i64 = 4;
 /// The oldest schema a backup may carry. Restoring one migrates it forward.
 pub const MIN_RESTORABLE_SCHEMA: i64 = 1;
 
@@ -122,6 +122,11 @@ const MIGRATION_3: &str = r#"
 ALTER TABLE rule_tables ADD COLUMN tools_json TEXT;
 "#;
 
+/// An opaque pack table keeps its rules out of the interface.
+const MIGRATION_4: &str = r#"
+ALTER TABLE rule_tables ADD COLUMN opaque INTEGER NOT NULL DEFAULT 0;
+"#;
+
 pub fn configure(conn: &Connection) -> Result<()> {
     conn.execute_batch(
         "PRAGMA foreign_keys = ON;
@@ -186,6 +191,11 @@ pub fn apply_pending(conn: &Connection, paths: &AppPaths) -> Result<Vec<i64>> {
         conn.execute_batch(MIGRATION_3)?;
         record_version(conn, 3)?;
         applied.push(3);
+    }
+    if current < 4 {
+        conn.execute_batch(MIGRATION_4)?;
+        record_version(conn, 4)?;
+        applied.push(4);
     }
     Ok(applied)
 }

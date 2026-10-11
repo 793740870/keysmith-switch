@@ -208,6 +208,7 @@ fn entry_for(archive: &[u8]) -> IndexPack {
         url: format!("{OFFICIAL_URL_PREFIX}x/hostile.pack-1.0.0.zip"),
         sha256: sha(archive),
         size: archive.len() as u64,
+        opaque: false,
     }
 }
 
@@ -718,7 +719,7 @@ fn packs_hosted_outside_the_sources_own_address_are_ignored() {
 
 /// A release with one rule pack at `version`, served at test-`release`.
 fn rule_release(fetch: &Fixture, release: &str, version: &str, rules: serde_json::Value) {
-    rule_release_for(fetch, release, version, rules, &["codex"], "0.2.5");
+    rule_release_for(fetch, release, version, rules, &["codex"], "0.2.5", false);
 }
 
 fn rule_release_for(
@@ -728,29 +729,34 @@ fn rule_release_for(
     rules: serde_json::Value,
     tools: &[&str],
     min_app: &str,
+    opaque: bool,
 ) {
     let rules_bytes = serde_json::to_vec(&serde_json::json!({ "rules": rules })).unwrap();
-    let manifest = serde_json::json!({
+    let mut manifest = serde_json::json!({
         "schema": 1, "id": "fixture.rules", "version": version, "min_app_version": min_app,
         "kind": "rules", "name": {"en": "Fixture rules", "zh-CN": "测试规则"},
         "description": {"en": "Rules for tests"}, "tools": tools,
         "rules": {"file": "rules.json", "sha256": sha(&rules_bytes)}
-    })
-    .to_string();
+    });
+    if opaque {
+        manifest["opaque"] = serde_json::json!(true);
+    }
+    let manifest = manifest.to_string();
     let archive = zip_of(&[
         ("pack.json", manifest.as_bytes()),
         ("rules.json", &rules_bytes),
     ]);
     let url = Fixture::url(release, &format!("fixture.rules-{version}.zip"));
-    let index = serde_json::json!({
-        "schema": 1,
-        "packs": [{
-            "id": "fixture.rules", "kind": "rules", "version": version, "min_app_version": min_app,
-            "name": {"en": "Fixture rules", "zh-CN": "测试规则"}, "description": {"en": "Rules"},
-            "tools": tools, "item_count": 0, "url": url, "sha256": sha(&archive),
-            "size": archive.len()
-        }]
+    let mut pack = serde_json::json!({
+        "id": "fixture.rules", "kind": "rules", "version": version, "min_app_version": min_app,
+        "name": {"en": "Fixture rules", "zh-CN": "测试规则"}, "description": {"en": "Rules"},
+        "tools": tools, "item_count": 0, "url": url, "sha256": sha(&archive),
+        "size": archive.len()
     });
+    if opaque {
+        pack["opaque"] = serde_json::json!(true);
+    }
+    let index = serde_json::json!({ "schema": 1, "packs": [pack] });
     fetch.set(&url, archive);
     fetch.set(
         &Fixture::url(release, "index.json"),
@@ -783,7 +789,9 @@ fn a_rule_pack_installs_as_a_read_only_table_and_never_touches_prompts() {
     let preview =
         keysmith_switch_lib::extensions::preview_rules(&fetch, &source("r1"), "fixture.rules")
             .unwrap();
-    assert_eq!(preview, vec![keysmith_rewrite::Rule::new("a", "b")]);
+    assert!(!preview.opaque);
+    assert_eq!(preview.count, 1);
+    assert_eq!(preview.rules, vec![keysmith_rewrite::Rule::new("a", "b")]);
     assert!(pack_table(&store).is_none(), "preview installs nothing");
 
     let (view, report) = install(
@@ -946,6 +954,7 @@ fn a_rule_pack_for_other_agents_installs_scoped_to_them() {
         serde_json::json!([{"from": "a", "to": "1"}]),
         &["claude", "zcode"],
         NEXT_MINOR,
+        false,
     );
     if !installs_next_minor(install(
         &store,
@@ -975,6 +984,7 @@ fn a_rule_pack_for_every_agent_applies_everywhere() {
         serde_json::json!([{"from": "a", "to": "1"}]),
         &["claude", "codex", "grok", "zcode"],
         NEXT_MINOR,
+        false,
     );
     if !installs_next_minor(install(
         &store,
@@ -1001,6 +1011,7 @@ fn a_rule_pack_for_other_agents_must_require_this_app() {
         serde_json::json!([{"from": "a", "to": "1"}]),
         &["claude"],
         "0.4.0",
+        false,
     );
     assert!(refresh(&store, &fetch, &source("rold"), "en")
         .packs
@@ -1086,4 +1097,100 @@ fn a_rule_pack_built_by_the_publisher_tooling_passes_the_app_checks() {
             keysmith_rewrite::Rule::new("um ", "")
         ]
     );
+}
+
+const OPAQUE_MIN: &str = "0.6.5";
+
+/// Until the release raises the app version to 0.6.5, an opaque pack is listed but neither
+/// previewed nor installed.
+fn opaque_installs() -> bool {
+    let app: Vec<u64> = keysmith_switch_lib::models::APP_VERSION
+        .split('.')
+        .map(|part| part.parse().unwrap())
+        .collect();
+    app >= vec![0, 6, 5]
+}
+
+#[test]
+fn an_opaque_rule_pack_preview_hides_the_rules() {
+    let (_tmp, store) = store();
+    let fetch = Fixture::with(&[]);
+    rule_release_for(
+        &fetch,
+        "ropaque",
+        "0.1.0",
+        serde_json::json!([{"from": "secret", "to": "shown"}]),
+        &["codex"],
+        OPAQUE_MIN,
+        true,
+    );
+    let view = refresh(&store, &fetch, &source("ropaque"), "en");
+    assert_eq!(view.packs.len(), 1);
+    assert!(view.packs[0].opaque);
+    if !opaque_installs() {
+        assert!(!view.packs[0].compatible);
+        assert!(matches!(
+            keysmith_switch_lib::extensions::preview_rules(
+                &fetch,
+                &source("ropaque"),
+                "fixture.rules"
+            ),
+            Err(ExtError::Incompatible(_))
+        ));
+        return;
+    }
+
+    let preview =
+        keysmith_switch_lib::extensions::preview_rules(&fetch, &source("ropaque"), "fixture.rules")
+            .unwrap();
+    assert!(preview.opaque);
+    assert_eq!(preview.count, 1);
+    assert!(preview.rules.is_empty());
+
+    install(
+        &store,
+        &fetch,
+        &source("ropaque"),
+        "fixture.rules",
+        "en",
+        true,
+    )
+    .unwrap();
+    let table = pack_table(&store).unwrap();
+    assert!(table.opaque);
+    assert_eq!(
+        table.rules,
+        vec![keysmith_rewrite::Rule::new("secret", "shown")]
+    );
+    assert!(store
+        .copy_rules_to_user(&table.id)
+        .unwrap_err()
+        .to_string()
+        .contains("hidden"));
+    let view = keysmith_switch_lib::rewrite::view(&store).unwrap();
+    let shown = view
+        .tables
+        .iter()
+        .find(|table| table.pack_id.as_deref() == Some("fixture.rules"))
+        .unwrap();
+    assert!(shown.rules.is_empty());
+    assert_eq!(shown.rule_count, 1);
+}
+
+#[test]
+fn an_opaque_rule_pack_that_allows_older_apps_is_not_listed() {
+    let (_tmp, store) = store();
+    let fetch = Fixture::with(&[]);
+    rule_release_for(
+        &fetch,
+        "roldopaque",
+        "0.1.0",
+        serde_json::json!([{"from": "a", "to": "1"}]),
+        &["codex"],
+        "0.4.0",
+        true,
+    );
+    assert!(refresh(&store, &fetch, &source("roldopaque"), "en")
+        .packs
+        .is_empty());
 }

@@ -149,13 +149,17 @@ pub fn view(store: &Store) -> Result<RewriteView> {
 /// `home` overrides where `.codex` is looked up (tests, isolated previews).
 pub fn view_with(store: &Store, home: Option<&Path>) -> Result<RewriteView> {
     let settings = store.get_settings()?;
+    let mut tables = store.list_rule_tables()?;
+    for table in &mut tables {
+        table.seal_for_view();
+    }
     Ok(RewriteView {
         enabled: settings.rewrite_enabled,
         codex_enabled: settings.rewrite_codex_enabled,
         claude_enabled: settings.rewrite_claude_enabled,
         grok_enabled: settings.rewrite_grok_enabled,
         zcode_enabled: settings.rewrite_zcode_enabled,
-        tables: store.list_rule_tables()?,
+        tables,
         codex: codex_view(store.paths(), home),
         claude: claude_view(store.paths(), home),
         zcode: zcode_view(store.paths(), home),

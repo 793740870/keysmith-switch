@@ -12,9 +12,11 @@
 //! prompt the person has edited is never overwritten.
 //!
 //! Rule packs (`kind: "rules"`) add a read-only input rewrite table. Installing one shows its
-//! rules first and is the person's explicit choice to switch it on. A newer version of a table
-//! that is on never applies by itself: it waits on the Rewrite page until the person accepts
-//! it. A table that is off follows the pack silently.
+//! rules first and is the person's explicit choice to switch it on, unless the pack is
+//! opaque: then the interface only shows a count. Opaque is about the interface only; the
+//! archive, the database and the relay's rules file still hold the text in the clear. A newer version of a table that is on
+//! never applies by itself: it waits on the Rewrite page until the person accepts it. A
+//! table that is off follows the pack silently.
 
 use crate::nowindow::NoWindow;
 use std::collections::{BTreeMap, BTreeSet};
@@ -53,12 +55,18 @@ const TOOLS: [&str; 4] = ["claude", "codex", "grok", "zcode"];
 /// v0.4.0 only listed rule packs for exactly `["codex"]`.
 const RULE_CODEX_ONLY: &str = "codex";
 const RULES_ANY_AGENT_MIN_APP: (u64, u64, u64) = (0, 5, 0);
+const RULES_OPAQUE_MIN_APP: (u64, u64, u64) = (0, 6, 5);
 
 /// True when a rule pack's agents and minimum app version agree.
 fn rule_tools_ok(tools: &[&str], min_app_version: &str) -> bool {
     tools == [RULE_CODEX_ONLY]
         || semver(min_app_version).is_some_and(|needs| needs >= RULES_ANY_AGENT_MIN_APP)
 }
+
+fn rule_opaque_ok(opaque: bool, min_app_version: &str) -> bool {
+    !opaque || semver(min_app_version).is_some_and(|needs| needs >= RULES_OPAQUE_MIN_APP)
+}
+
 /// Every prompt a pack adds carries this tag, so they can be found in the library.
 pub const PACK_TAG: &str = "extension";
 
@@ -209,6 +217,8 @@ pub struct IndexPack {
     pub url: String,
     pub sha256: String,
     pub size: u64,
+    /// True when the pack asked the app not to show its rules.
+    pub opaque: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -281,11 +291,20 @@ fn parse_index_pack(value: &Value, source: &Source) -> Option<IndexPack> {
         .filter_map(|tool| tool.as_str().map(str::to_string))
         .filter(|tool| TOOLS.contains(&tool.as_str()))
         .collect();
+    let opaque = object
+        .get("opaque")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
     if kind == PackKind::Rules {
         let names: Vec<&str> = tools.iter().map(String::as_str).collect();
-        if names.is_empty() || !rule_tools_ok(&names, &min_app_version) {
+        if names.is_empty()
+            || !rule_tools_ok(&names, &min_app_version)
+            || !rule_opaque_ok(opaque, &min_app_version)
+        {
             return None;
         }
+    } else if opaque {
+        return None;
     }
     Some(IndexPack {
         id,
@@ -299,6 +318,7 @@ fn parse_index_pack(value: &Value, source: &Source) -> Option<IndexPack> {
         url,
         sha256,
         size,
+        opaque,
     })
 }
 
@@ -366,6 +386,7 @@ pub struct LoadedPack {
     pub rules: Vec<keysmith_rewrite::Rule>,
     /// The agents a rule pack is for.
     pub tools: Vec<keysmith_rewrite::Tool>,
+    pub opaque: bool,
 }
 
 fn safe_name(name: &str) -> bool {
@@ -485,6 +506,17 @@ fn load_manifest(
         if !rule_tools_ok(&tools, text("min_app_version").unwrap_or("")) {
             return invalid("pack.json: a rule pack for other agents needs min_app_version 0.5.0");
         }
+        let opaque = match manifest.get("opaque") {
+            None => false,
+            Some(Value::Bool(value)) => *value,
+            Some(_) => return invalid("pack.json: opaque must be a boolean"),
+        };
+        if !rule_opaque_ok(opaque, text("min_app_version").unwrap_or("")) {
+            return invalid("pack.json: an opaque rule pack needs min_app_version 0.6.5");
+        }
+        if opaque != expected.opaque {
+            return invalid("pack.json: opaque does not match the index entry");
+        }
         let rules = load_rules(manifest, files)?;
         return Ok(LoadedPack {
             id: expected.id.clone(),
@@ -497,7 +529,11 @@ fn load_manifest(
                 .iter()
                 .filter_map(|tool| keysmith_rewrite::Tool::parse(tool))
                 .collect(),
+            opaque,
         });
+    }
+    if manifest.get("opaque").is_some() {
+        return invalid("pack.json: opaque is only for rule packs");
     }
     let entries = manifest
         .get("items")
@@ -575,6 +611,7 @@ fn load_manifest(
         items,
         rules: Vec::new(),
         tools: Vec::new(),
+        opaque: false,
     })
 }
 
@@ -742,6 +779,8 @@ pub struct PackView {
     pub compatible: bool,
     pub installed_version: Option<String>,
     pub update_available: bool,
+    #[serde(default)]
+    pub opaque: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -802,6 +841,7 @@ fn build_view(
             compatible: ok,
             installed_version: installed,
             update_available: newer && ok,
+            opaque: pack.opaque,
         });
     }
     let updates = packs.iter().filter(|pack| pack.update_available).count() as u32;
@@ -1040,6 +1080,7 @@ fn apply_rules(
         &pack.rules,
         &pack.tools,
         enable,
+        pack.opaque,
     )?;
     crate::rewrite::publish(store)?;
     let mut report = Report::default();
@@ -1068,12 +1109,21 @@ fn apply_rules(
     Ok(report)
 }
 
+/// What the install dialog shows for a rule pack: the rules, or only a count when opaque.
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct RulePreview {
+    pub opaque: bool,
+    pub count: usize,
+    pub rules: Vec<keysmith_rewrite::Rule>,
+}
+
 /// The rules a rule pack would add, read from the verified archive without installing it.
 pub fn preview_rules(
     fetch: &dyn Fetch,
     source: &Source,
     pack_id: &str,
-) -> std::result::Result<Vec<keysmith_rewrite::Rule>, ExtError> {
+) -> std::result::Result<RulePreview, ExtError> {
     let (index, _) = fetch_index(fetch, source)?;
     let entry = index
         .packs
@@ -1086,7 +1136,12 @@ pub fn preview_rules(
     let archive = fetch
         .get(&entry.url, MAX_ARCHIVE_BYTES)
         .map_err(ExtError::Offline)?;
-    Ok(check_archive(&archive, entry)?.rules)
+    let pack = check_archive(&archive, entry)?;
+    Ok(RulePreview {
+        opaque: pack.opaque,
+        count: pack.rules.len(),
+        rules: if pack.opaque { Vec::new() } else { pack.rules },
+    })
 }
 
 /// After a successful look at the index: bring installed rule packs up to date. A table
