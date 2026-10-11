@@ -1,1 +1,1 @@
-Keysmith Switch v0.6.4：Grok Build 适配器更新到 grok-keysmith v0.8.0，config.toml 新增「用户区域」，部署后自己加的配置（如 API key 备用模型）放进去，停用时会保留。
+Keysmith Switch v0.6.5：支持密封规则包。安装和更新时只展示名称和条数，不展示规则正文，也不能复制到「我的规则」；中转服务照常替换。
