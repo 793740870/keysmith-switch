@@ -320,6 +320,25 @@ npx tauri build --target aarch64-apple-darwin --config src-tauri/tauri.preview.m
 
 </details>
 
+<details>
+<summary><b>官网</b></summary>
+
+<br />
+
+官网 <https://jia-ethan.github.io/keysmith-switch-site/> 的源码在 [`Jia-Ethan/keysmith-switch-site`](https://github.com/Jia-Ethan/keysmith-switch-site)。版本号、安装包大小、下载链接和更新日志从本仓库的 Releases 自动同步，不用手动改：官网每天自动重建一次，页面打开时也会查最新版；想立刻更新，在官网仓库的 Actions 里手动运行一次 Deploy。
+
+本仓库有以下改动时，检查官网是否要跟着改，需要的话在官网仓库开 PR。官网描述的是已发布的版本，所以通常等新版发布后再合并。
+
+- 适配器版本（`ToolKind::expected_version`）；
+- 用户能看到的功能、行为或文案，例如部署、清理、输入替换、拓展；界面明显改版时，要重录官网的导览视频；
+- 系统要求、支持的 Agent；
+- App 的联网行为，例如检查更新、公告、拓展；
+- README 里的社区与反馈渠道。
+
+每类改动对应官网的哪些文件，见官网仓库 README 的「App 更新后要检查什么」。
+
+</details>
+
 ## 📜 版本历史
 
 <details>
