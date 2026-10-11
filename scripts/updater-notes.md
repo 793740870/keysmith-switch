@@ -1,1 +1,1 @@
-Keysmith Switch v0.6.3：修复 Windows 上切换入口、打开设置时卡顿；操作被拒绝时直接写出原因；Grok Build 清理后不再一直显示「部署中」；连接输入替换后，Grok 自定义模型不再发出登录令牌。
+Keysmith Switch v0.6.4：Grok Build 适配器更新到 grok-keysmith v0.8.0，config.toml 新增「用户区域」，部署后自己加的配置（如 API key 备用模型）放进去，停用时会保留。

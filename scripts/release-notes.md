@@ -1,20 +1,19 @@
-# Keysmith Switch v0.6.3
+# Keysmith Switch v0.6.4
 
-修复 Windows 上点切换入口、进设置页时卡顿甚至无响应；操作被拒绝时会直接写出原因，不再只显示 `ok=false`、`exit 1`。
+Grok Build 适配器更新到 [grok-keysmith v0.8.0](https://github.com/Jia-Ethan/grok-keysmith/releases/tag/v0.8.0)：`~/.grok/config.toml` 新增「用户区域」，部署后自己加的长期配置放进去，停用时会保留。
 
 ## 这一版有什么
 
-- **Windows 上切换入口、打开设置不再卡住。** 检查更新、读取「关于」里的版本信息、读取输入替换的状态，以前会让窗口等上几秒到几十秒，严重时显示「未响应」。现在这些都在后台进行，界面可以照常操作。
-- **操作被拒绝时会写出原因。** 以前部署或停用被拒绝时，弹窗里有时只有 `ok=false`、`exit 1` 这样的记录，看不出为什么。现在会显示适配器给出的原因，例如 ZCode 找不到自己的安装位置、Grok 找不到部署记录。
-- **Grok Build 清理之后不再一直显示「部署中」。** 配置被手动改过时清理 Grok，部署其实已经清掉了，但 Switch 还把它显示成正在生效，点「停用」会报错。现在清理后会如实显示未部署。已经遇到这个问题的，升级后再点一次「停用」就能恢复正常。
-- **连接输入替换后，Grok Build 的自定义模型不再发出登录令牌。** 如果你自己配置的模型把 Grok 自带的模型当作上游，连接输入替换后，请求会带上 grok.com 的登录令牌，而不是你配置的 `api_key`。现在连接时会把这样的自带模型留在中转之外，页面的详情里会列出；已经连接的，页面会提示重新连接。
-- 「整理配置」的提示只在部署被拒绝时出现，不再出现在整理、停用等其他弹窗里。
+- **Grok Build 的配置里可以留一块自己的区域。** 在 `~/.grok/config.toml` 末尾的 `# === keysmith user region begin ===` 和 `# === keysmith user region end ===` 之间，放部署后自己加的配置，例如订阅额度用完时用 `/model` 手动切过去的 API key 备用模型。这一段不算配置被改动，部署、停用、整理和恢复时都会原样保留。以前这些配置会让 Grok 显示配置被改动、无法重新部署，停用时还会被一起抹掉。
+  - 区域里不能放 `[compat.*]` 表，要以表头（`[...]`）开头。具体规则见 [grok-keysmith 使用说明](https://github.com/Jia-Ethan/grok-keysmith/blob/main/docs/reference.md)。
+  - 连接输入替换后，Switch 写入的区域仍然排在文件最后，和用户区域互不影响。
+- 不使用这块区域的用户不受影响。
 
 ## 安装
 
-- 已安装 `v0.1.3` 及以上的版本，可以在应用内点「检查更新」升级到 `v0.6.3`，安装仍需你确认。
-- macOS Apple Silicon：`Keysmith.Switch_0.6.3_aarch64.dmg`
-- Windows x64：`Keysmith.Switch_0.6.3_x64-setup.exe`
+- 已安装 `v0.1.3` 及以上的版本，可以在应用内点「检查更新」升级到 `v0.6.4`，安装仍需你确认。
+- macOS Apple Silicon：`Keysmith.Switch_0.6.4_aarch64.dmg`
+- Windows x64：`Keysmith.Switch_0.6.4_x64-setup.exe`
 
 安装包没有使用 Apple Developer ID、公证或 Windows Authenticode。更新包用独立的生产 minisign 密钥签名，这不是平台代码签名。
 
