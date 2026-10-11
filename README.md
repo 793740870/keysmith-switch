@@ -348,6 +348,7 @@ npx tauri build --target aarch64-apple-darwin --config src-tauri/tauri.preview.m
 
 | 版本 | 更新内容 |
 | --- | --- |
+| [`v0.6.5`](https://github.com/Jia-Ethan/keysmith-switch-releases/releases/tag/v0.6.5) | 支持密封规则包（`opaque`）：安装、输入替换页和更新确认只展示名称、条数和适用的 Agent，不展示规则正文，也不能复制到「我的规则」；中转服务照常按原文替换。密封只是界面上不展示，规则在本机仍是明文。[#140](https://github.com/Jia-Ethan/keysmith-switch/pull/140) |
 | [`v0.6.4`](https://github.com/Jia-Ethan/keysmith-switch-releases/releases/tag/v0.6.4) | Grok Build 适配器更新到 grok-keysmith v0.8.0：`config.toml` 新增「用户区域」，部署后自己加的配置（如 API key 备用模型）放进去，不算配置被改动，停用时会保留。[#136](https://github.com/Jia-Ethan/keysmith-switch/pull/136) |
 | [`v0.6.3`](https://github.com/Jia-Ethan/keysmith-switch-releases/releases/tag/v0.6.3) | 修复 Windows 上切换入口、打开设置时卡顿甚至无响应；部署或停用被拒绝时直接写出原因，不再只显示 `ok=false`、`exit 1`；Grok Build 清理之后不再一直显示「部署中」；连接输入替换后，把 Grok 自带模型当作上游的自定义模型不再发出登录令牌。[#125](https://github.com/Jia-Ethan/keysmith-switch/pull/125)–[#128](https://github.com/Jia-Ethan/keysmith-switch/pull/128) |
 | [`v0.6.2`](https://github.com/Jia-Ethan/keysmith-switch-releases/releases/tag/v0.6.2) | 右键提示词卡片会弹出操作菜单：打开、编辑、部署、复制、复制到其他工具、删除；正在生效的提示词要先停用才能删除，详情页的「⋯」菜单也一样。右键不再弹出「重新载入」等系统菜单，误点不会再丢掉没保存的草稿。[#121](https://github.com/Jia-Ethan/keysmith-switch/pull/121) |

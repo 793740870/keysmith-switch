@@ -1,19 +1,21 @@
-# Keysmith Switch v0.6.4
+# Keysmith Switch v0.6.5
 
-Grok Build 适配器更新到 [grok-keysmith v0.8.0](https://github.com/Jia-Ethan/grok-keysmith/releases/tag/v0.8.0)：`~/.grok/config.toml` 新增「用户区域」，部署后自己加的长期配置放进去，停用时会保留。
+输入替换支持**密封规则包**：拓展仓库可以发布 `opaque: true` 的规则包，App 只展示名称、条数和适用的 Agent，不展示规则正文。
 
 ## 这一版有什么
 
-- **Grok Build 的配置里可以留一块自己的区域。** 在 `~/.grok/config.toml` 末尾的 `# === keysmith user region begin ===` 和 `# === keysmith user region end ===` 之间，放部署后自己加的配置，例如订阅额度用完时用 `/model` 手动切过去的 API key 备用模型。这一段不算配置被改动，部署、停用、整理和恢复时都会原样保留。以前这些配置会让 Grok 显示配置被改动、无法重新部署，停用时还会被一起抹掉。
-  - 区域里不能放 `[compat.*]` 表，要以表头（`[...]`）开头。具体规则见 [grok-keysmith 使用说明](https://github.com/Jia-Ethan/grok-keysmith/blob/main/docs/reference.md)。
-  - 连接输入替换后，Switch 写入的区域仍然排在文件最后，和用户区域互不影响。
-- 不使用这块区域的用户不受影响。
+- **密封规则包。** 安装时只显示名称、条数和适用的 Agent，按钮是「安装」而不是「查看规则」。在「输入替换」页，这张表只显示条数和「密封」说明，没有规则列表，也没有「复制到我的规则」。
+  - 已启用的密封表有新版本时，仍要你确认才会切换；确认框只展示版本号和新旧条数，不展示差异。
+  - 中转服务照常按原文替换，替换效果和普通规则包一样。
+  - 密封只是界面上不展示，不是加密：规则在本机数据库、备份和 `~/.keysmith-switch/input-rewrite/rules.json` 里仍是明文。
+- 普通规则包、提示词包和其他功能不受影响。目前官方源里还没有密封规则包。
+- 更早的版本会把密封规则包显示为「需要新版 App」，不能安装。
 
 ## 安装
 
-- 已安装 `v0.1.3` 及以上的版本，可以在应用内点「检查更新」升级到 `v0.6.4`，安装仍需你确认。
-- macOS Apple Silicon：`Keysmith.Switch_0.6.4_aarch64.dmg`
-- Windows x64：`Keysmith.Switch_0.6.4_x64-setup.exe`
+- 已安装 `v0.1.3` 及以上的版本，可以在应用内点「检查更新」升级到 `v0.6.5`，安装仍需你确认。
+- macOS Apple Silicon：`Keysmith.Switch_0.6.5_aarch64.dmg`
+- Windows x64：`Keysmith.Switch_0.6.5_x64-setup.exe`
 
 安装包没有使用 Apple Developer ID、公证或 Windows Authenticode。更新包用独立的生产 minisign 密钥签名，这不是平台代码签名。
 
