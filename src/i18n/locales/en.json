@@ -733,7 +733,7 @@
     "reviewTitle": "Rule pack update: {{title}}",
     "reviewBodyOn": "This table is on. Once you accept, the new rules apply from the next message.",
     "reviewBodyOff": "This table is off. Accepting switches it to the new version; it applies once you turn it on.",
-    "reviewBodySealed": "This is a sealed rule pack; the update does not show the text. Accepting switches {{from}} rules to {{to}} rules in v{{version}}.",
+    "reviewBodySealed": "This is a sealed rule pack; the update does not show the text. v{{version}} has {{to}} rules (now {{from}}).",
     "accept": "Use new version",
     "accepted": "Switched to the new version",
     "diffAdded": "Added",

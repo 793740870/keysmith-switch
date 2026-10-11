@@ -733,7 +733,7 @@
     "reviewTitle": "規則包更新：{{title}}",
     "reviewBodyOn": "這張表正在啟用。確認後，下一輪對話起按新規則替換。",
     "reviewBodyOff": "這張表沒有啟用。確認後切換到新版本，啟用後才會生效。",
-    "reviewBodySealed": "這是密封規則包，更新不展示正文。確認後從 {{from}} 條切換到 v{{version}} 的 {{to}} 條。",
+    "reviewBodySealed": "這是密封規則包，更新不展示正文。v{{version}} 有 {{to}} 條（現在 {{from}} 條）。",
     "accept": "啟用新版本",
     "accepted": "已切換到新版本",
     "diffAdded": "新增",

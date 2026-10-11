@@ -13,7 +13,8 @@
 //!
 //! Rule packs (`kind: "rules"`) add a read-only input rewrite table. Installing one shows its
 //! rules first and is the person's explicit choice to switch it on, unless the pack is
-//! opaque: then the interface only shows a count. A newer version of a table that is on
+//! opaque: then the interface only shows a count. Opaque is about the interface only; the
+//! archive, the database and the relay's rules file still hold the text in the clear. A newer version of a table that is on
 //! never applies by itself: it waits on the Rewrite page until the person accepts it. A
 //! table that is off follows the pack silently.
 

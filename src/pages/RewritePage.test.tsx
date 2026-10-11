@@ -439,6 +439,8 @@ describe("RewritePage", () => {
     render(<RewritePage toast={toast as never} />);
     fireEvent.click(await screen.findByTestId("rewrite-review-p.one"));
     expect(screen.getByRole("dialog")).toHaveTextContent("密封");
+    expect(screen.getByRole("dialog")).toHaveTextContent("v1.1.0 有 4 条（现在 1 条）");
+    expect(screen.getByRole("dialog")).toHaveTextContent("下一轮对话起");
     expect(screen.queryByTestId("rewrite-diff")).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId("rewrite-accept"));
     await waitFor(() => expect(rewriteAcceptUpdate).toHaveBeenCalledWith("pack:p.one"));

@@ -1101,6 +1101,16 @@ fn a_rule_pack_built_by_the_publisher_tooling_passes_the_app_checks() {
 
 const OPAQUE_MIN: &str = "0.6.5";
 
+/// Until the release raises the app version to 0.6.5, an opaque pack is listed but neither
+/// previewed nor installed.
+fn opaque_installs() -> bool {
+    let app: Vec<u64> = keysmith_switch_lib::models::APP_VERSION
+        .split('.')
+        .map(|part| part.parse().unwrap())
+        .collect();
+    app >= vec![0, 6, 5]
+}
+
 #[test]
 fn an_opaque_rule_pack_preview_hides_the_rules() {
     let (_tmp, store) = store();
@@ -1117,6 +1127,18 @@ fn an_opaque_rule_pack_preview_hides_the_rules() {
     let view = refresh(&store, &fetch, &source("ropaque"), "en");
     assert_eq!(view.packs.len(), 1);
     assert!(view.packs[0].opaque);
+    if !opaque_installs() {
+        assert!(!view.packs[0].compatible);
+        assert!(matches!(
+            keysmith_switch_lib::extensions::preview_rules(
+                &fetch,
+                &source("ropaque"),
+                "fixture.rules"
+            ),
+            Err(ExtError::Incompatible(_))
+        ));
+        return;
+    }
 
     let preview =
         keysmith_switch_lib::extensions::preview_rules(&fetch, &source("ropaque"), "fixture.rules")
@@ -1156,7 +1178,7 @@ fn an_opaque_rule_pack_preview_hides_the_rules() {
 }
 
 #[test]
-fn an_opaque_rule_pack_on_an_old_app_is_not_listed() {
+fn an_opaque_rule_pack_that_allows_older_apps_is_not_listed() {
     let (_tmp, store) = store();
     let fetch = Fixture::with(&[]);
     rule_release_for(
