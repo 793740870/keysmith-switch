@@ -40,6 +40,10 @@ pub struct RuleTable {
     pub pack_version: Option<String>,
     /// The agents this table applies to; `None` means every agent.
     pub tools: Option<Vec<Tool>>,
+    /// True when the pack asked the app not to show `from` / `to` in the interface.
+    pub opaque: bool,
+    /// How many rules the table holds, including when [`Self::rules`] is empty for an opaque table.
+    pub rule_count: usize,
     pub rules: Vec<Rule>,
     /// A pack update that waits for the person to accept it.
     pub pending: Option<PendingUpdate>,
@@ -51,6 +55,11 @@ pub struct PendingUpdate {
     pub version: String,
     pub title: String,
     pub rules: Vec<Rule>,
+    /// How many rules the pending version holds; set when the view is built.
+    #[serde(default)]
+    pub rule_count: usize,
+    #[serde(default)]
+    pub opaque: bool,
 }
 
 impl RuleTable {
@@ -58,6 +67,20 @@ impl RuleTable {
         self.tools
             .as_ref()
             .is_none_or(|tools| tools.contains(&tool))
+    }
+
+    /// Fill counts, then drop rule text the interface must not show.
+    pub fn seal_for_view(&mut self) {
+        self.rule_count = self.rules.len();
+        if self.opaque {
+            self.rules.clear();
+        }
+        if let Some(pending) = &mut self.pending {
+            pending.rule_count = pending.rules.len();
+            if pending.opaque || self.opaque {
+                pending.rules.clear();
+            }
+        }
     }
 }
 
@@ -89,7 +112,7 @@ impl Store {
     pub fn list_rule_tables(&self) -> Result<Vec<RuleTable>> {
         let conn = self.conn()?;
         let mut stmt = conn.prepare(
-            "SELECT id, kind, title, enabled, priority, pack_id, pack_version, pending_json, tools_json
+            "SELECT id, kind, title, enabled, priority, pack_id, pack_version, pending_json, tools_json, opaque
              FROM rule_tables
              ORDER BY CASE kind WHEN 'user' THEN 0 ELSE 1 END, priority, created_at",
         )?;
@@ -98,6 +121,7 @@ impl Store {
                 let kind: String = row.get(1)?;
                 let pending: Option<String> = row.get(7)?;
                 let tools: Option<String> = row.get(8)?;
+                let opaque: i64 = row.get(9)?;
                 Ok(RuleTable {
                     id: row.get(0)?,
                     kind: if kind == "user" {
@@ -111,6 +135,8 @@ impl Store {
                     pack_id: row.get(5)?,
                     pack_version: row.get(6)?,
                     tools: tools.as_deref().and_then(parse_tools),
+                    opaque: opaque != 0,
+                    rule_count: 0,
                     rules: Vec::new(),
                     pending: pending.and_then(|text| serde_json::from_str(&text).ok()),
                 })
@@ -128,6 +154,10 @@ impl Store {
                     ))
                 })?
                 .collect::<std::result::Result<Vec<_>, _>>()?;
+            table.rule_count = table.rules.len();
+            if let Some(pending) = &mut table.pending {
+                pending.rule_count = pending.rules.len();
+            }
         }
         if !tables.iter().any(|table| table.kind == TableKind::User) {
             tables.insert(
@@ -141,6 +171,8 @@ impl Store {
                     pack_id: None,
                     pack_version: None,
                     tools: None,
+                    opaque: false,
+                    rule_count: 0,
                     rules: Vec::new(),
                     pending: None,
                 },
@@ -241,6 +273,11 @@ impl Store {
             .iter()
             .find(|table| table.id == id && table.kind == TableKind::Pack)
             .ok_or_else(|| Error::invalid("rule table not found"))?;
+        if source.opaque {
+            return Err(Error::invalid(
+                "this rule pack keeps its rules hidden; it cannot be copied",
+            ));
+        }
         let mut mine = tables
             .iter()
             .find(|table| table.kind == TableKind::User)
@@ -266,6 +303,7 @@ impl Store {
         rules: &[Rule],
         tools: &[Tool],
         enable: bool,
+        opaque: bool,
     ) -> Result<bool> {
         validate_table(rules).map_err(invalid_rules)?;
         let id = pack_table_id(pack_id);
@@ -289,8 +327,8 @@ impl Store {
                 tx.execute(
                     "INSERT INTO rule_tables
                      (id, kind, title, enabled, priority, pack_id, pack_version, tools_json,
-                      created_at, updated_at)
-                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?9)",
+                      opaque, created_at, updated_at)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?10)",
                     params![
                         id,
                         TableKind::Pack.as_str(),
@@ -300,6 +338,7 @@ impl Store {
                         pack_id,
                         version,
                         pack_tools_json(tools),
+                        opaque as i64,
                         now
                     ],
                 )?;
@@ -311,6 +350,8 @@ impl Store {
                     version: version.into(),
                     title: title.into(),
                     rules: rules.to_vec(),
+                    rule_count: rules.len(),
+                    opaque,
                 };
                 tx.execute(
                     "UPDATE rule_tables SET pending_json = ?2, updated_at = ?3 WHERE id = ?1",
@@ -322,9 +363,16 @@ impl Store {
                 tx.execute(
                     "UPDATE rule_tables
                      SET title = ?2, pack_version = ?3, pending_json = NULL,
-                         enabled = MAX(enabled, ?4), updated_at = ?5
+                         enabled = MAX(enabled, ?4), opaque = ?5, updated_at = ?6
                      WHERE id = ?1",
-                    params![id, title, version, enable as i64, now_rfc3339()],
+                    params![
+                        id,
+                        title,
+                        version,
+                        enable as i64,
+                        opaque as i64,
+                        now_rfc3339()
+                    ],
                 )?;
                 replace_rules(&tx, &id, rules)?;
                 false
@@ -353,9 +401,9 @@ impl Store {
             validate_table(&pending.rules).map_err(invalid_rules)?;
             tx.execute(
                 "UPDATE rule_tables
-                 SET title = ?2, pack_version = ?3, pending_json = NULL, updated_at = ?4
+                 SET title = ?2, pack_version = ?3, pending_json = NULL, opaque = ?4, updated_at = ?5
                  WHERE id = ?1",
-                params![id, pending.title, pending.version, now_rfc3339()],
+                params![id, pending.title, pending.version, pending.opaque as i64, now_rfc3339()],
             )?;
             replace_rules(&tx, id, &pending.rules)?;
             tx.commit()?;

@@ -242,10 +242,24 @@ export function RewritePage({ toast }: { toast: ToastApi }) {
           void run("accept", () => api.rewriteAcceptUpdate(table.id), t("rewrite.accepted")).then(() => setReviewing(null));
         }}
       >
-        <p className="mb-3 text-[13px] text-muted-foreground">
-          {reviewing?.enabled ? t("rewrite.reviewBodyOn") : t("rewrite.reviewBodyOff")}
-        </p>
-        {reviewing?.pending ? <RuleDiff before={reviewing.rules} after={reviewing.pending.rules} /> : null}
+        {reviewing?.pending ? (
+          <>
+            <p className="mb-3 text-[13px] text-muted-foreground">
+              {reviewing.pending.opaque || reviewing.opaque
+                ? t("rewrite.reviewBodySealed", {
+                    from: reviewing.ruleCount ?? reviewing.rules.length,
+                    to: reviewing.pending.ruleCount ?? reviewing.pending.rules.length,
+                    version: reviewing.pending.version,
+                  })
+                : reviewing.enabled
+                  ? t("rewrite.reviewBodyOn")
+                  : t("rewrite.reviewBodyOff")}
+            </p>
+            {reviewing.pending.opaque || reviewing.opaque ? null : (
+              <RuleDiff before={reviewing.rules} after={reviewing.pending.rules} />
+            )}
+          </>
+        ) : null}
       </ConfirmDialog>
     </section>
   );

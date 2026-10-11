@@ -17,6 +17,10 @@ function appliesTo(table: RuleTable, tool: Filter) {
   return tool === "all" || table.tools === null || table.tools.includes(tool);
 }
 
+function tableCount(table: RuleTable) {
+  return table.ruleCount ?? table.rules.length;
+}
+
 function matches(rule: RewriteRule, query: string) {
   if (!query) return true;
   const q = query.toLowerCase();
@@ -76,7 +80,7 @@ export function RuleTables({
   const mine = tables.find((table) => table.kind === "user");
   const packs = tables.filter((table) => table.kind === "pack");
   const visiblePacks = packs.filter((table) => appliesTo(table, filter));
-  const total = tables.reduce((sum, table) => sum + table.rules.length, 0);
+  const total = tables.reduce((sum, table) => sum + tableCount(table), 0);
   const toggleCollapsed = (id: string) =>
     setCollapsed((list) => (list.includes(id) ? list.filter((item) => item !== id) : [...list, id]));
 
@@ -523,7 +527,7 @@ function PackTable({
       <TableHeader
         title={title}
         subtitle={`${t("rewrite.pack")}${table.packVersion ? ` v${table.packVersion}` : ""}`}
-        count={table.rules.length}
+        count={tableCount(table)}
         enabled={table.enabled}
         busy={busy}
         collapsed={collapsed}
@@ -537,17 +541,19 @@ function PackTable({
         <IconButton label={t("rewrite.moveDown", { table: title })} disabled={busy || last} onClick={() => onMove(1)}>
           <IconChevronDown size={14} />
         </IconButton>
-        <Button
-          size="xs"
-          variant="ghost"
-          title={t("rewrite.copyHint")}
-          disabled={busy}
-          onClick={onCopy}
-          data-testid={`rewrite-copy-${table.packId}`}
-        >
-          <IconCopy size={13} />
-          <span className="hidden sm:inline">{t("rewrite.copyToMine")}</span>
-        </Button>
+        {table.opaque ? null : (
+          <Button
+            size="xs"
+            variant="ghost"
+            title={t("rewrite.copyHint")}
+            disabled={busy}
+            onClick={onCopy}
+            data-testid={`rewrite-copy-${table.packId}`}
+          >
+            <IconCopy size={13} />
+            <span className="hidden sm:inline">{t("rewrite.copyToMine")}</span>
+          </Button>
+        )}
       </TableHeader>
       {table.pending ? (
         <div className="flex flex-wrap items-center gap-2 border-t border-border bg-warning/10 px-5 py-2 text-[12.5px] text-warning-strong">
@@ -562,6 +568,12 @@ function PackTable({
       {collapsed ? null : (
         <div className="border-t border-border">
           <ScopeChips table={table} title={title} busy={busy} onScope={onScope} />
+          {table.opaque ? (
+            <p className="px-5 py-3 text-[12.5px] text-muted-foreground" data-testid={`rewrite-pack-sealed-${table.packId}`}>
+              {t("rewrite.sealed")}
+            </p>
+          ) : (
+            <>
           <p className="px-5 pt-1 text-[12px] text-muted-foreground">{t("rewrite.readOnly")}</p>
           {shown.length === 0 ? (
             <p className="px-5 py-3 text-[12.5px] text-muted-foreground">{t("rewrite.rules.noMatch")}</p>
@@ -589,6 +601,8 @@ function PackTable({
               {showAll ? t("rewrite.rules.showLess") : t("rewrite.rules.showAll", { count: rules.length })}
             </button>
           ) : null}
+            </>
+          )}
         </div>
       )}
     </div>

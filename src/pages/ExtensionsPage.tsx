@@ -9,7 +9,7 @@ import { ToolLogo } from "../components/ToolLogos";
 import { Button, cx, Switch } from "../components/ui";
 import type { ToastApi } from "../hooks/useToasts";
 import { formatBytes, relativeTime } from "../lib/format";
-import type { ExtensionPack, ExtensionReport, RewriteRule } from "../types";
+import type { ExtensionPack, ExtensionReport, RulePreview } from "../types";
 
 /**
  * Extension packs: prompt bundles that the official source publishes and that update on
@@ -22,8 +22,8 @@ export function ExtensionsPage({ toast }: { toast: ToastApi }) {
   const [enabling, setEnabling] = useState(false);
   const [disabling, setDisabling] = useState(false);
   const [removing, setRemoving] = useState<ExtensionPack | null>(null);
-  // A rule pack is installed only after its rules have been shown.
-  const [previewing, setPreviewing] = useState<{ pack: ExtensionPack; rules: RewriteRule[] | null } | null>(null);
+  // A rule pack is installed only after its rules have been shown (or a sealed summary).
+  const [previewing, setPreviewing] = useState<{ pack: ExtensionPack; preview: RulePreview | null } | null>(null);
   const [updatingAll, setUpdatingAll] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const view = ext.view;
@@ -103,10 +103,10 @@ export function ExtensionsPage({ toast }: { toast: ToastApi }) {
   };
 
   const preview = async (pack: ExtensionPack) => {
-    setPreviewing({ pack, rules: null });
+    setPreviewing({ pack, preview: null });
     try {
-      const rules = await api.previewExtensionRules(pack.id);
-      setPreviewing((current) => (current?.pack.id === pack.id ? { pack, rules } : current));
+      const next = await api.previewExtensionRules(pack.id);
+      setPreviewing((current) => (current?.pack.id === pack.id ? { pack, preview: next } : current));
     } catch (error) {
       setPreviewing(null);
       fail(error);
@@ -256,7 +256,7 @@ export function ExtensionsPage({ toast }: { toast: ToastApi }) {
         cancelLabel={t("common.cancel")}
         closeLabel={t("common.close")}
         confirmTestId="extensions-rules-install-enable"
-        confirmDisabled={!previewing?.rules}
+        confirmDisabled={!previewing?.preview}
         busy={previewing ? ext.busyId === previewing.pack.id : false}
         onClose={() => setPreviewing(null)}
         onConfirm={() => {
@@ -269,7 +269,7 @@ export function ExtensionsPage({ toast }: { toast: ToastApi }) {
             size="sm"
             variant="ghost"
             data-testid="extensions-rules-install-only"
-            disabled={!previewing?.rules || (previewing ? ext.busyId === previewing.pack.id : false)}
+            disabled={!previewing?.preview || (previewing ? ext.busyId === previewing.pack.id : false)}
             onClick={() => {
               const current = previewing;
               if (!current) return;
@@ -280,13 +280,21 @@ export function ExtensionsPage({ toast }: { toast: ToastApi }) {
           </Button>
         }
       >
-        <p className="mb-3 text-[13px] text-muted-foreground">{t("extensions.rules.previewBody")}</p>
-        {previewing?.rules ? (
+        <p className="mb-3 text-[13px] text-muted-foreground">
+          {(previewing?.preview?.opaque ?? previewing?.pack.opaque)
+            ? t("extensions.rules.previewBodySealed")
+            : t("extensions.rules.previewBody")}
+        </p>
+        {previewing?.preview?.opaque ? (
+          <p className="text-[13.5px] text-foreground" data-testid="extensions-rules-preview-sealed">
+            {t("extensions.rules.sealedCount", { count: previewing.preview.count })}
+          </p>
+        ) : previewing?.preview ? (
           <ul
             className="grid max-h-[50vh] grid-cols-[minmax(0,max-content)_auto_minmax(0,1fr)] gap-x-2 gap-y-0.5 overflow-y-auto font-mono text-[12.5px]"
             data-testid="extensions-rules-preview"
           >
-            {previewing.rules.map((rule) => (
+            {previewing.preview.rules.map((rule) => (
               <li key={rule.from} className="contents">
                 <span className="truncate text-foreground">{rule.from}</span>
                 <span className="text-muted-foreground">→</span>
@@ -397,7 +405,13 @@ function PackCard({
           {pack.compatible && (!installed || pack.updateAvailable) ? (
             <Button size="sm" variant="primary" loading={busy} disabled={locked && !busy} data-testid={`extension-install-${pack.id}`} onClick={onInstall}>
               <IconDownload size={13} />
-              {installed ? t("extensions.update") : pack.kind === "rules" ? t("extensions.rules.view") : t("extensions.install")}
+              {installed
+                ? t("extensions.update")
+                : pack.kind === "rules"
+                  ? pack.opaque
+                    ? t("extensions.rules.install")
+                    : t("extensions.rules.view")
+                  : t("extensions.install")}
             </Button>
           ) : null}
         </div>

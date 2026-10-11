@@ -58,6 +58,7 @@ fn user_rules_come_before_packs_and_packs_follow_their_order() {
             &rules(&[("x", "one"), ("y", "one")]),
             &[Tool::Codex],
             true,
+            false,
         )
         .unwrap();
     store
@@ -68,6 +69,7 @@ fn user_rules_come_before_packs_and_packs_follow_their_order() {
             &rules(&[("y", "two")]),
             &[Tool::Codex],
             true,
+            false,
         )
         .unwrap();
     let active = store.active_rules(Tool::Codex).unwrap();
@@ -92,6 +94,7 @@ fn disabled_table_contributes_nothing() {
             "One",
             &rules(&[("a", "b")]),
             &[Tool::Codex],
+            false,
             false,
         )
         .unwrap();
@@ -119,6 +122,7 @@ fn enabled_pack_update_waits_for_acceptance() {
             &rules(&[("a", "1")]),
             &[Tool::Codex],
             true,
+            false,
         )
         .unwrap();
     let pending = store
@@ -128,6 +132,7 @@ fn enabled_pack_update_waits_for_acceptance() {
             "One",
             &rules(&[("a", "2")]),
             &[Tool::Codex],
+            false,
             false,
         )
         .unwrap();
@@ -164,6 +169,7 @@ fn disabled_pack_updates_silently() {
             &rules(&[("a", "1")]),
             &[Tool::Codex],
             false,
+            false,
         )
         .unwrap();
     let pending = store
@@ -173,6 +179,7 @@ fn disabled_pack_updates_silently() {
             "One",
             &rules(&[("a", "2")]),
             &[Tool::Codex],
+            false,
             false,
         )
         .unwrap();
@@ -200,6 +207,7 @@ fn copy_to_user_skips_text_already_matched() {
             "One",
             &rules(&[("a", "p"), ("b", "p")]),
             &[Tool::Codex],
+            false,
             false,
         )
         .unwrap();
@@ -245,6 +253,7 @@ fn clear_all_removes_rules() {
             &rules(&[("c", "d")]),
             &[Tool::Codex],
             true,
+            false,
         )
         .unwrap();
     store.clear_all().unwrap();
@@ -310,7 +319,8 @@ fn restoring_a_schema_2_backup_keeps_tables_for_every_agent() {
         let conn = rusqlite::Connection::open(&old_db).unwrap();
         conn.execute_batch(
             "ALTER TABLE rule_tables DROP COLUMN tools_json;
-             DELETE FROM schema_migrations WHERE version = 3;",
+             ALTER TABLE rule_tables DROP COLUMN opaque;
+             DELETE FROM schema_migrations WHERE version >= 3;",
         )
         .unwrap();
     }
@@ -319,7 +329,10 @@ fn restoring_a_schema_2_backup_keeps_tables_for_every_agent() {
     let (_tmp2, paths2) = AppPaths::in_temp_dir().unwrap();
     let store = Store::open(&paths2).unwrap();
     store.restore_snapshot(&old_db, &empty_prompts).unwrap();
-    assert_eq!(store.schema_version().unwrap(), 3);
+    assert_eq!(
+        store.schema_version().unwrap(),
+        keysmith_switch_lib::db::schema::SCHEMA_VERSION
+    );
     for tool in Tool::ALL {
         assert_eq!(store.active_rules(tool).unwrap(), rules(&[("a", "b")]));
     }
@@ -338,6 +351,7 @@ fn a_table_can_be_narrowed_to_some_agents() {
             &rules(&[("c", "d")]),
             &[Tool::Claude],
             true,
+            false,
         )
         .unwrap();
     assert_eq!(
@@ -375,7 +389,15 @@ fn a_pack_update_keeps_the_agents_the_person_chose() {
     let store = Store::open(&paths).unwrap();
     let all = Tool::ALL;
     store
-        .upsert_pack_rules("p.one", "1.0.0", "One", &rules(&[("c", "d")]), &all, false)
+        .upsert_pack_rules(
+            "p.one",
+            "1.0.0",
+            "One",
+            &rules(&[("c", "d")]),
+            &all,
+            false,
+            false,
+        )
         .unwrap();
     let id = pack_table_id("p.one");
     assert_eq!(store.list_rule_tables().unwrap()[1].tools, None);
@@ -383,7 +405,15 @@ fn a_pack_update_keeps_the_agents_the_person_chose() {
         .set_rule_table_tools(&id, Some(&[Tool::Codex]))
         .unwrap();
     store
-        .upsert_pack_rules("p.one", "1.1.0", "One", &rules(&[("e", "f")]), &all, false)
+        .upsert_pack_rules(
+            "p.one",
+            "1.1.0",
+            "One",
+            &rules(&[("e", "f")]),
+            &all,
+            false,
+            false,
+        )
         .unwrap();
     let table = store.list_rule_tables().unwrap().remove(1);
     assert_eq!(table.pack_version.as_deref(), Some("1.1.0"));
@@ -419,4 +449,83 @@ fn snapshot_stays_readable_by_a_v040_relay() {
     assert!(snapshot.matcher(Tool::Codex).is_none());
     assert_eq!(snapshot.matcher(Tool::Claude).unwrap().rewrite("a"), "b");
     assert!(snapshot.matcher(Tool::Zcode).is_none());
+}
+
+#[test]
+fn an_opaque_table_keeps_rules_for_the_relay_and_hides_them_from_the_view() {
+    let (_tmp, paths) = AppPaths::in_temp_dir().unwrap();
+    let store = Store::open(&paths).unwrap();
+    store
+        .upsert_pack_rules(
+            "p.sealed",
+            "1.0.0",
+            "Sealed",
+            &rules(&[("secret", "shown")]),
+            &[Tool::Codex],
+            true,
+            true,
+        )
+        .unwrap();
+    assert_eq!(
+        store.active_rules(Tool::Codex).unwrap(),
+        rules(&[("secret", "shown")])
+    );
+    let listed = store
+        .list_rule_tables()
+        .unwrap()
+        .into_iter()
+        .find(|table| table.pack_id.as_deref() == Some("p.sealed"))
+        .unwrap();
+    assert!(listed.opaque);
+    assert_eq!(listed.rules, rules(&[("secret", "shown")]));
+    assert_eq!(listed.rule_count, 1);
+
+    let view = rewrite::view(&store).unwrap();
+    let table = view
+        .tables
+        .iter()
+        .find(|table| table.pack_id.as_deref() == Some("p.sealed"))
+        .unwrap();
+    assert!(table.opaque);
+    assert_eq!(table.rule_count, 1);
+    assert!(table.rules.is_empty());
+
+    let error = store
+        .copy_rules_to_user(&pack_table_id("p.sealed"))
+        .unwrap_err();
+    assert!(error.to_string().contains("hidden"));
+}
+
+#[test]
+fn an_opaque_pending_update_is_redacted_in_the_view() {
+    let (_tmp, paths) = AppPaths::in_temp_dir().unwrap();
+    let store = Store::open(&paths).unwrap();
+    store
+        .upsert_pack_rules(
+            "p.sealed",
+            "1.0.0",
+            "Sealed",
+            &rules(&[("a", "1")]),
+            &[Tool::Codex],
+            true,
+            true,
+        )
+        .unwrap();
+    assert!(store
+        .upsert_pack_rules(
+            "p.sealed",
+            "1.1.0",
+            "Sealed",
+            &rules(&[("a", "2"), ("b", "3")]),
+            &[Tool::Codex],
+            true,
+            true,
+        )
+        .unwrap());
+    let view = rewrite::view(&store).unwrap();
+    let pending = view.tables[1].pending.as_ref().unwrap();
+    assert!(pending.opaque);
+    assert_eq!(pending.rule_count, 2);
+    assert!(pending.rules.is_empty());
+    assert_eq!(pending.version, "1.1.0");
 }

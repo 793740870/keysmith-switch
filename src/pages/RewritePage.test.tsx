@@ -405,6 +405,44 @@ describe("RewritePage", () => {
     fireEvent.click(screen.getByRole("switch", { name: "启用Pack one" }));
     await waitFor(() => expect(rewriteSetTableEnabled).toHaveBeenCalledWith("pack:p.one", false));
   });
+
+  it("hides a sealed pack's rules and has no copy button", async () => {
+    rewriteState.mockResolvedValue(
+      view({
+        tables: [
+          mine,
+          pack({
+            title: "Sealed",
+            opaque: true,
+            ruleCount: 3,
+            rules: [],
+          }),
+        ],
+      }),
+    );
+    render(<RewritePage toast={toast as never} />);
+    expect(await screen.findByTestId("rewrite-pack-sealed-p.one")).toHaveTextContent("密封");
+    expect(screen.queryByTestId("rewrite-copy-p.one")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("rewrite-pack-rules-p.one")).not.toBeInTheDocument();
+    expect(screen.getByTestId("rewrite-table-p.one")).toHaveTextContent("3 条");
+  });
+
+  it("reviews a sealed pack update as a count, without a diff", async () => {
+    const table = pack({
+      opaque: true,
+      ruleCount: 1,
+      rules: [],
+      pending: { version: "1.1.0", title: "Pack one", rules: [], ruleCount: 4, opaque: true },
+    });
+    rewriteState.mockResolvedValue(view({ tables: [mine, table] }));
+    rewriteAcceptUpdate.mockResolvedValue(view({ tables: [mine, pack({ packVersion: "1.1.0", opaque: true, ruleCount: 4, rules: [] })] }));
+    render(<RewritePage toast={toast as never} />);
+    fireEvent.click(await screen.findByTestId("rewrite-review-p.one"));
+    expect(screen.getByRole("dialog")).toHaveTextContent("密封");
+    expect(screen.queryByTestId("rewrite-diff")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("rewrite-accept"));
+    await waitFor(() => expect(rewriteAcceptUpdate).toHaveBeenCalledWith("pack:p.one"));
+  });
 });
 
 describe("ruleDiff", () => {

@@ -412,6 +412,15 @@ export interface ExtensionPack {
   compatible: boolean;
   installedVersion: string | null;
   updateAvailable: boolean;
+  /** A sealed rule pack: the interface never shows from / to. */
+  opaque?: boolean;
+}
+
+/** What the install dialog shows for a rule pack. */
+export interface RulePreview {
+  opaque: boolean;
+  count: number;
+  rules: RewriteRule[];
 }
 
 export interface ExtensionsView {
@@ -573,6 +582,9 @@ export interface RulePendingUpdate {
   version: string;
   title: string;
   rules: RewriteRule[];
+  /** How many rules the pending version holds, including when rules is empty for a sealed pack. */
+  ruleCount?: number;
+  opaque?: boolean;
 }
 
 export interface RuleTable {
@@ -585,6 +597,10 @@ export interface RuleTable {
   packVersion: string | null;
   /** The agents this table applies to; null means every agent. */
   tools: ToolId[] | null;
+  /** True when the pack asked the app not to show from / to. */
+  opaque?: boolean;
+  /** How many rules the table holds, including when rules is empty for a sealed pack. */
+  ruleCount?: number;
   rules: RewriteRule[];
   /** An update to an enabled pack table that waits for the person to accept it. */
   pending: RulePendingUpdate | null;
