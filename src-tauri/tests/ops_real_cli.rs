@@ -438,7 +438,7 @@ async fn real_pi_deploys_reads_back_and_removes_without_touching_its_other_files
     };
     let tmp = tempfile::tempdir().unwrap();
     let user_home = tmp.path().join("home");
-    let pi_dir = user_home.join(".pi/agent");
+    let pi_dir = user_home.join(".pi").join("agent");
     std::fs::create_dir_all(&pi_dir).unwrap();
     let append = b"append: keep me\r\n".to_vec();
     let agents = b"# agents\nkeep me too\n".to_vec();

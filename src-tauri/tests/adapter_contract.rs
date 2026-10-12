@@ -728,7 +728,7 @@ async fn pi_fixture_contract() {
     let home = tmp.path().join("home");
     std::fs::create_dir_all(&home).unwrap();
     let opts = opts(&home, "pi-keysmith.py");
-    let pi_dir = home.join(".pi/agent");
+    let pi_dir = home.join(".pi").join("agent");
 
     // No ~/.pi/agent: not installed, a valid status, and a deploy is blocked without writing.
     let missing = run_adapter_with(ToolKind::Pi, pi_status(), &opts)
@@ -887,7 +887,7 @@ async fn pi_fixture_contract() {
 async fn pi_busy_lock_and_failed_write_are_told_apart() {
     let tmp = tempfile::tempdir().unwrap();
     let home = tmp.path().join("home");
-    let pi_dir = home.join(".pi/agent");
+    let pi_dir = home.join(".pi").join("agent");
     std::fs::create_dir_all(&pi_dir).unwrap();
     let file = home.join("prompt.md");
     std::fs::write(&file, "hello pi\n").unwrap();
