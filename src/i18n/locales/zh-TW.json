@@ -8,6 +8,7 @@
     "codex": "Codex",
     "grok": "Grok Build",
     "zcode": "ZCode",
+    "pi": "pi",
     "settings": "設定",
     "about": "關於",
     "advanced": "進階工具",
@@ -289,10 +290,10 @@
     "environment": "內建工具檢查",
     "ready": "可用",
     "pythonRequired": "目前版本需要本機 Python。",
-    "noPythonRequired": "四個工具均為內建版本，不需要安裝 Python。",
+    "noPythonRequired": "五個工具均為內建版本，不需要安裝 Python。",
     "noCandidates": "沒有發現可匯入的既有提示詞。",
     "checkTitle": "首次啟動檢查",
-    "checkHint": "確認四個內建 Keysmith 工具和本機環境狀態。"
+    "checkHint": "確認五個內建 Keysmith 工具和本機環境狀態。"
   },
   "recovery": {
     "title": "資料已從備份恢復",

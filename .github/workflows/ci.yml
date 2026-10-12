@@ -53,6 +53,7 @@ jobs:
       - run: test -x src-tauri/binaries/keysmith-codex-aarch64-apple-darwin
       - run: test -x src-tauri/binaries/keysmith-grok-aarch64-apple-darwin
       - run: test -x src-tauri/binaries/keysmith-zcode-aarch64-apple-darwin
+      - run: test -x src-tauri/binaries/keysmith-pi-aarch64-apple-darwin
       - run: test -x src-tauri/binaries/keysmith-relay-aarch64-apple-darwin
 
   sidecar-windows:
@@ -71,6 +72,7 @@ jobs:
             "keysmith-codex-x86_64-pc-windows-msvc.exe",
             "keysmith-grok-x86_64-pc-windows-msvc.exe",
             "keysmith-zcode-x86_64-pc-windows-msvc.exe",
+            "keysmith-pi-x86_64-pc-windows-msvc.exe",
             "keysmith-relay-x86_64-pc-windows-msvc.exe"
           )
           foreach ($sidecar in $sidecars) {

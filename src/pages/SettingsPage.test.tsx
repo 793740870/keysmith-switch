@@ -399,6 +399,7 @@ describe("SettingsPage data safety", () => {
     expect(screen.getByTestId("keysmith-codex")).toHaveTextContent("Codex Keysmith");
     expect(screen.getByTestId("keysmith-grok")).toHaveTextContent("Grok Keysmith");
     expect(screen.getByTestId("keysmith-zcode")).toHaveTextContent("Zcode Keysmith");
+    expect(screen.getByTestId("keysmith-pi")).toHaveTextContent("pi Keysmith");
     fireEvent.click(screen.getByTestId("keysmith-repo-grok"));
     expect(openExternal).toHaveBeenCalledWith("https://github.com/Jia-Ethan/grok-keysmith");
     expect(screen.queryByText("官方产品")).not.toBeInTheDocument();

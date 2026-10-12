@@ -424,3 +424,129 @@ async fn real_zcode_refusal_on_stderr_says_why() {
         envelope.blockers
     );
 }
+
+/// The real pi adapter, in a temporary home: activate, read back, deactivate, read back. pi's
+/// own APPEND_SYSTEM.md and AGENTS.md stay byte for byte as they were the whole time, and a
+/// prompt the library forgot can be taken back from SYSTEM.md.
+#[tokio::test]
+async fn real_pi_deploys_reads_back_and_removes_without_touching_its_other_files() {
+    if !python3_available() {
+        return;
+    }
+    let Some(cli) = vendor("pi/pi-keysmith.py") else {
+        return;
+    };
+    let tmp = tempfile::tempdir().unwrap();
+    let user_home = tmp.path().join("home");
+    let pi_dir = user_home.join(".pi/agent");
+    std::fs::create_dir_all(&pi_dir).unwrap();
+    let append = b"append: keep me\r\n".to_vec();
+    let agents = b"# agents\nkeep me too\n".to_vec();
+    std::fs::write(pi_dir.join("APPEND_SYSTEM.md"), &append).unwrap();
+    std::fs::write(pi_dir.join("AGENTS.md"), &agents).unwrap();
+    let paths = AppPaths::from_home(tmp.path().join("switch"));
+    paths.ensure().unwrap();
+    let store = Store::open(&paths).unwrap();
+    let opts = AdapterOptions {
+        home: Some(user_home.clone()),
+        cli_override: Some(cli),
+        ..AdapterOptions::default()
+    };
+    let untouched = || {
+        assert_eq!(
+            std::fs::read(pi_dir.join("APPEND_SYSTEM.md")).unwrap(),
+            append
+        );
+        assert_eq!(std::fs::read(pi_dir.join("AGENTS.md")).unwrap(), agents);
+    };
+
+    let body = "# pi prompt\nAsk before deleting.\n";
+    let deployed = keysmith_switch_lib::harness::deploy_harness_with(
+        &store,
+        ToolKind::Pi,
+        &opts,
+        Some(body.into()),
+    )
+    .await
+    .unwrap();
+    assert!(deployed.ok, "{deployed:?}");
+    assert_eq!(
+        std::fs::read_to_string(pi_dir.join("SYSTEM.md")).unwrap(),
+        body
+    );
+    untouched();
+
+    let state = keysmith_switch_lib::harness::harness_state(&store, ToolKind::Pi, &opts)
+        .await
+        .unwrap();
+    assert!(state.deployed && !state.drifted, "{state:?}");
+    assert_eq!(state.prompt_id, deployed.prompt_id);
+
+    keysmith_switch_lib::ops::delete_prompt(&store, &deployed.prompt_id.unwrap()).unwrap();
+    let id =
+        keysmith_switch_lib::harness::adopt_live_prompt(&store, ToolKind::Pi, "Adopted", &opts)
+            .await
+            .unwrap();
+    assert_eq!(store.get_prompt(&id).unwrap().content, body);
+
+    let removed = keysmith_switch_lib::harness::remove_harness(&store, ToolKind::Pi, &opts)
+        .await
+        .unwrap();
+    assert!(removed.ok, "{removed:?}");
+    assert!(!pi_dir.join("SYSTEM.md").exists());
+    untouched();
+
+    let after = keysmith_switch_lib::harness::harness_state(&store, ToolKind::Pi, &opts)
+        .await
+        .unwrap();
+    assert!(!after.deployed, "{after:?}");
+    let status = tool_status(&store, ToolKind::Pi, Scope::User, None, &opts)
+        .await
+        .unwrap();
+    assert_eq!(
+        status.status,
+        keysmith_switch_lib::models::ToolStatus::NotInstalled
+    );
+    assert!(status.ok);
+    untouched();
+}
+
+/// The real pi adapter with no `~/.pi/agent`: nothing is created, and the refusal says why.
+#[tokio::test]
+async fn real_pi_without_its_folder_refuses_and_creates_nothing() {
+    if !python3_available() {
+        return;
+    }
+    let Some(cli) = vendor("pi/pi-keysmith.py") else {
+        return;
+    };
+    let tmp = tempfile::tempdir().unwrap();
+    let user_home = tmp.path().join("home");
+    std::fs::create_dir_all(&user_home).unwrap();
+    let paths = AppPaths::from_home(tmp.path().join("switch"));
+    paths.ensure().unwrap();
+    let store = Store::open(&paths).unwrap();
+    let opts = AdapterOptions {
+        home: Some(user_home.clone()),
+        cli_override: Some(cli),
+        ..AdapterOptions::default()
+    };
+    let outcome = keysmith_switch_lib::harness::deploy_harness_with(
+        &store,
+        ToolKind::Pi,
+        &opts,
+        Some("# pi\n".into()),
+    )
+    .await
+    .unwrap();
+    assert!(!outcome.ok);
+    assert!(
+        outcome
+            .error
+            .as_deref()
+            .unwrap()
+            .starts_with("pi-dir-missing: "),
+        "{outcome:?}"
+    );
+    assert!(!user_home.join(".pi").exists());
+}

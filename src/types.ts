@@ -1,4 +1,4 @@
-export type ToolId = "claude" | "codex" | "grok" | "zcode";
+export type ToolId = "claude" | "codex" | "grok" | "zcode" | "pi";
 
 export type ScopeId = "user" | "project" | "local";
 
@@ -393,7 +393,7 @@ export const DEFAULT_SETTINGS: Settings = {
   rewriteZcodeEnabled: true,
 };
 
-export const TOOL_IDS: ToolId[] = ["claude", "codex", "grok", "zcode"];
+export const TOOL_IDS: ToolId[] = ["claude", "codex", "grok", "zcode", "pi"];
 
 /** An extension pack as the interface shows it; the text is already in the app's language. */
 export interface ExtensionPack {

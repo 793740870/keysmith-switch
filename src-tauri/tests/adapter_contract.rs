@@ -679,3 +679,343 @@ fn a_refusal_only_on_stderr_is_reported() {
     // Nothing on stderr either: nothing is made up.
     assert!(failed("").blockers.is_empty());
 }
+
+fn pi_status() -> AdapterCommand {
+    AdapterCommand::Status {
+        scope: Scope::User,
+        project_dir: None,
+        name: None,
+    }
+}
+
+fn pi_plan(file: &std::path::Path) -> AdapterCommand {
+    AdapterCommand::PlanActivate {
+        file: file.to_path_buf(),
+        scope: Scope::User,
+        project_dir: None,
+        name: Some("system-prompt".into()),
+        runtime: false,
+        append_file: None,
+        max_tokens: None,
+    }
+}
+
+fn pi_activate(file: &std::path::Path, token: Option<String>) -> AdapterCommand {
+    AdapterCommand::Activate {
+        file: file.to_path_buf(),
+        scope: Scope::User,
+        project_dir: None,
+        name: Some("system-prompt".into()),
+        runtime: false,
+        append_file: None,
+        max_tokens: None,
+        expected_preview_token: token,
+    }
+}
+
+fn pi_recover(execute: bool, token: Option<String>) -> AdapterCommand {
+    AdapterCommand::Recover {
+        scope: Scope::User,
+        project_dir: None,
+        execute,
+        expected_preview_token: token,
+    }
+}
+
+#[tokio::test]
+async fn pi_fixture_contract() {
+    let tmp = tempfile::tempdir().unwrap();
+    let home = tmp.path().join("home");
+    std::fs::create_dir_all(&home).unwrap();
+    let opts = opts(&home, "pi-keysmith.py");
+    let pi_dir = home.join(".pi/agent");
+
+    // No ~/.pi/agent: not installed, a valid status, and a deploy is blocked without writing.
+    let missing = run_adapter_with(ToolKind::Pi, pi_status(), &opts)
+        .await
+        .unwrap();
+    assert_envelope(&missing, ToolKind::Pi, "status");
+    assert!(missing.ok, "{missing:?}");
+    assert_eq!(missing.status, ToolStatus::NotInstalled);
+    assert_eq!(
+        arg_after(&missing.argv, "--pi-dir"),
+        Some(pi_dir.to_str().unwrap())
+    );
+    assert!(std::path::Path::new(arg_after(&missing.argv, "--pi-dir").unwrap()).is_absolute());
+    for flag in ["--status", "--json"] {
+        assert!(missing.argv.iter().any(|item| item == flag), "{flag}");
+    }
+    assert_eq!(arg_after(&missing.argv, "--lang"), Some("en"));
+    let file = home.join("prompt.md");
+    std::fs::write(&file, "hello pi\n").unwrap();
+    let blocked = run_adapter_with(ToolKind::Pi, pi_plan(&file), &opts)
+        .await
+        .unwrap();
+    assert!(!blocked.ok);
+    assert!(
+        blocked.blockers[0].starts_with("pi-dir-missing: "),
+        "{:?}",
+        blocked.blockers
+    );
+    assert!(blocked.confirmation_token.is_none());
+    assert!(!pi_dir.exists());
+
+    // Empty folder: not installed; a preview plans SYSTEM.md and hands out its token.
+    std::fs::create_dir_all(&pi_dir).unwrap();
+    let plan = run_adapter_with(ToolKind::Pi, pi_plan(&file), &opts)
+        .await
+        .unwrap();
+    assert!(plan.ok && plan.preview, "{plan:?}");
+    assert!(plan.argv.iter().any(|item| item == "--dry-run"));
+    assert!(!plan.argv.iter().any(|item| item == "--yes"));
+    assert!(!plan
+        .argv
+        .iter()
+        .any(|item| item == "--expected-preview-token"));
+    assert_eq!(plan.status, ToolStatus::NotInstalled);
+    let token = plan.confirmation_token.clone().expect("preview token");
+    assert_eq!(token.len(), 64);
+    assert_eq!(
+        plan.planned_files[0].path,
+        pi_dir.join("SYSTEM.md").display().to_string()
+    );
+    assert!(
+        !pi_dir.join("SYSTEM.md").exists(),
+        "a preview writes nothing"
+    );
+
+    // A confirm needs the preview's token.
+    assert!(
+        run_adapter_with(ToolKind::Pi, pi_activate(&file, None), &opts)
+            .await
+            .is_err()
+    );
+    let confirmed = run_adapter_with(ToolKind::Pi, pi_activate(&file, Some(token.clone())), &opts)
+        .await
+        .unwrap();
+    assert!(confirmed.ok && !confirmed.preview, "{confirmed:?}");
+    assert!(confirmed
+        .argv
+        .windows(2)
+        .any(|pair| pair[0] == "--expected-preview-token" && pair[1] == token));
+    assert!(confirmed.argv.iter().any(|item| item == "--yes"));
+    assert!(!confirmed.argv.iter().any(|item| item == "--dry-run"));
+    assert_eq!(confirmed.status, ToolStatus::Active);
+    let body_sha = keysmith_switch_lib::models::sha256_hex("hello pi\n");
+    assert_eq!(
+        confirmed.current_fingerprint.as_deref(),
+        Some(body_sha.as_str())
+    );
+
+    // The same token again: the state moved on, so exit 3 and nothing written.
+    let stale = run_adapter_with(ToolKind::Pi, pi_activate(&file, Some(token)), &opts)
+        .await
+        .unwrap();
+    assert!(!stale.ok);
+    assert_eq!(stale.exit_code, 3);
+    assert!(!stale.recovery_required);
+    assert!(stale.error.as_deref().unwrap().contains("preview again"));
+
+    let active = run_adapter_with(ToolKind::Pi, pi_status(), &opts)
+        .await
+        .unwrap();
+    assert_eq!(active.status, ToolStatus::Active);
+    assert!(active.ok);
+    assert!(active
+        .target_paths
+        .iter()
+        .any(|target| target.role == "system_file" && target.exists));
+
+    // Hand-edited SYSTEM.md: drift, exit 0, still ok. A deploy plan is not held up by it.
+    std::fs::write(pi_dir.join("SYSTEM.md"), "edited\n").unwrap();
+    let drift = run_adapter_with(ToolKind::Pi, pi_status(), &opts)
+        .await
+        .unwrap();
+    assert_eq!(drift.status, ToolStatus::Drift);
+    assert!(drift.ok);
+    assert_eq!(drift.exit_code, 0);
+    let redeploy = run_adapter_with(ToolKind::Pi, pi_plan(&file), &opts)
+        .await
+        .unwrap();
+    assert!(redeploy.ok && redeploy.blockers.is_empty(), "{redeploy:?}");
+    assert_ne!(redeploy.status, ToolStatus::Drift);
+
+    // Leftover temp file: recovery-required. ok=false and exit 1, yet a valid state.
+    std::fs::write(pi_dir.join(".keysmith-leftover"), "x").unwrap();
+    let residue = run_adapter_with(ToolKind::Pi, pi_status(), &opts)
+        .await
+        .unwrap();
+    assert_eq!(residue.status, ToolStatus::RecoveryRequired);
+    assert!(residue.recovery_required);
+    assert!(!residue.ok);
+    assert_eq!(residue.exit_code, 1);
+    assert!(
+        residue.error.is_none(),
+        "a state, not a CLI failure: {residue:?}"
+    );
+
+    // Recover: preview first, then confirm with its token.
+    let preview = run_adapter_with(ToolKind::Pi, pi_recover(false, None), &opts)
+        .await
+        .unwrap();
+    assert!(preview.ok && preview.preview, "{preview:?}");
+    assert!(preview.argv.iter().any(|item| item == "--recover"));
+    assert!(!preview.argv.iter().any(|item| item == "--yes"));
+    assert_eq!(preview.planned_files.len(), 1);
+    let recovered = run_adapter_with(
+        ToolKind::Pi,
+        pi_recover(true, preview.confirmation_token.clone()),
+        &opts,
+    )
+    .await
+    .unwrap();
+    assert!(recovered.ok && !recovered.preview, "{recovered:?}");
+    assert!(!pi_dir.join(".keysmith-leftover").exists());
+
+    // Conflict: also ok=false / exit 1, shown as the state it is.
+    std::fs::write(pi_dir.join(".fixture-conflict"), "x").unwrap();
+    let conflict = run_adapter_with(ToolKind::Pi, pi_status(), &opts)
+        .await
+        .unwrap();
+    assert_eq!(conflict.status, ToolStatus::Conflict);
+    assert!(!conflict.ok);
+    assert_eq!(conflict.conflicts, vec!["manifest-invalid".to_string()]);
+    assert!(conflict.error.is_none(), "{conflict:?}");
+}
+
+#[tokio::test]
+async fn pi_busy_lock_and_failed_write_are_told_apart() {
+    let tmp = tempfile::tempdir().unwrap();
+    let home = tmp.path().join("home");
+    let pi_dir = home.join(".pi/agent");
+    std::fs::create_dir_all(&pi_dir).unwrap();
+    let file = home.join("prompt.md");
+    std::fs::write(&file, "hello pi\n").unwrap();
+    let mut opts = opts(&home, "pi-keysmith.py");
+    let plan = run_adapter_with(ToolKind::Pi, pi_plan(&file), &opts)
+        .await
+        .unwrap();
+    let token = plan.confirmation_token.clone().unwrap();
+
+    opts.extra_env
+        .insert("FIXTURE_LOCK_BUSY".into(), "1".into());
+    let busy = run_adapter_with(ToolKind::Pi, pi_activate(&file, Some(token.clone())), &opts)
+        .await
+        .unwrap();
+    assert!(!busy.ok);
+    assert_eq!(busy.exit_code, 5);
+    assert!(!busy.recovery_required);
+    assert!(busy.error.as_deref().unwrap().contains("try again"));
+    assert!(
+        busy.blockers[0].starts_with("lock-busy: "),
+        "{:?}",
+        busy.blockers
+    );
+    assert!(!pi_dir.join("SYSTEM.md").exists());
+
+    opts.extra_env.remove("FIXTURE_LOCK_BUSY");
+    opts.extra_env
+        .insert("FIXTURE_WRITE_FAILED".into(), "1".into());
+    let failed = run_adapter_with(ToolKind::Pi, pi_activate(&file, Some(token)), &opts)
+        .await
+        .unwrap();
+    assert!(!failed.ok);
+    assert_eq!(failed.exit_code, 4);
+    assert!(failed.recovery_required);
+    assert!(failed.error.as_deref().unwrap().contains("recover"));
+}
+
+#[tokio::test]
+async fn pi_backups_and_reconcile_are_unsupported() {
+    let tmp = tempfile::tempdir().unwrap();
+    let opts = opts(tmp.path(), "pi-keysmith.py");
+    for command in [
+        AdapterCommand::Backups {
+            scope: Scope::User,
+            project_dir: None,
+        },
+        AdapterCommand::Reconcile {
+            execute: false,
+            expected_preview_token: None,
+        },
+    ] {
+        assert!(run_adapter_with(ToolKind::Pi, command, &opts)
+            .await
+            .is_err());
+    }
+}
+
+fn pi_captured(stdout: &str, exit_code: i32) -> Captured {
+    Captured {
+        stdout: stdout.into(),
+        stderr: String::new(),
+        exit_code,
+        timed_out: false,
+        truncated: false,
+        argv: vec!["--status".into()],
+    }
+}
+
+/// A pi adapter older than the contract, or one that names another scope, is not trusted.
+#[test]
+fn pi_envelope_version_and_scope_are_checked() {
+    let envelope = |version: &str, scope: &str| {
+        format!(
+            r#"{{"schema":"pi-keysmith.envelope.v1","tool":"pi-keysmith","version":"{version}","operation":"status","preview":true,"apply":false,"ok":true,"exit_code":0,"target":{{"pi_dir":"/h/.pi/agent","pi_dir_resolved":"/h/.pi/agent","scope":"{scope}"}},"status":{{"state":"active-aligned","recovery_required":false,"nodes":{{}},"conflicts":[],"drift":[],"residue":{{"journals":[],"cleanup_markers":[],"temp_files":[]}},"blockers":{{"deploy":[],"uninstall":[]}},"deployable":true,"uninstall_ready":true}},"plan":null,"result":null,"diagnostics":["windows-beta: beta"]}}"#
+        )
+    };
+    let run = |stdout: String| {
+        normalize(
+            ToolKind::Pi,
+            &pi_status(),
+            &pi_captured(&stdout, 0),
+            Envelope::new(ToolKind::Pi, "status"),
+        )
+    };
+    let current = run(envelope("0.2.0", "user"));
+    assert!(current.ok, "{current:?}");
+    assert_eq!(current.status, ToolStatus::Active);
+    assert!(
+        current.blockers.is_empty(),
+        "windows-beta is a warning only"
+    );
+    assert_eq!(current.warnings, vec!["windows-beta: beta".to_string()]);
+    assert!(run(envelope("0.10.1", "user")).ok);
+
+    let old = run(envelope("0.1.0", "user"));
+    assert!(!old.ok);
+    assert!(old.error.as_deref().unwrap().contains("too old"));
+
+    let project = run(envelope("0.2.0", "project"));
+    assert!(!project.ok);
+    assert!(project.error.as_deref().unwrap().contains("scope"));
+}
+
+/// A token that is not 64 lowercase hex is not passed on.
+#[test]
+fn pi_token_must_be_lowercase_hex() {
+    let stdout = |token: &str| {
+        format!(
+            r#"{{"schema":"pi-keysmith.envelope.v1","version":"0.2.0","operation":"uninstall","preview":true,"ok":true,"exit_code":0,"target":{{"pi_dir":"/h/.pi/agent","scope":"user"}},"status":{{"state":"active-aligned"}},"plan":{{"confirmation_token":"{token}","blockers":[],"writes":[]}},"result":null,"diagnostics":[]}}"#
+        )
+    };
+    let command = AdapterCommand::PlanDeactivate {
+        scope: Scope::User,
+        project_dir: None,
+        name: None,
+        salvage_config: false,
+    };
+    let token = |value: &str| {
+        normalize(
+            ToolKind::Pi,
+            &command,
+            &pi_captured(&stdout(value), 0),
+            Envelope::new(ToolKind::Pi, "plan-deactivate"),
+        )
+        .confirmation_token
+    };
+    let good = "a".repeat(64);
+    assert_eq!(token(&good), Some(good.clone()));
+    assert_eq!(token(&"A".repeat(64)), None);
+    assert_eq!(token(&"a".repeat(63)), None);
+}

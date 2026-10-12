@@ -8,6 +8,7 @@
     "codex": "Codex",
     "grok": "Grok Build",
     "zcode": "ZCode",
+    "pi": "pi",
     "settings": "Settings",
     "about": "About",
     "advanced": "Advanced Tools",
@@ -289,10 +290,10 @@
     "environment": "Bundled tool check",
     "ready": "Ready",
     "pythonRequired": "This build requires local Python.",
-    "noPythonRequired": "All four tools are bundled; Python is not required.",
+    "noPythonRequired": "All five tools are bundled; Python is not required.",
     "noCandidates": "No existing prompts were found to import.",
     "checkTitle": "First-run check",
-    "checkHint": "Verify the four bundled Keysmith tools and local environment."
+    "checkHint": "Verify the five bundled Keysmith tools and local environment."
   },
   "recovery": {
     "title": "Data was rebuilt",

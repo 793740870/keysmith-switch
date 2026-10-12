@@ -15,6 +15,7 @@ const SEED: Array<[ToolId, string, string, string[], number]> = [
   ["codex", "重构小能手", "只做行为不变的重构；每一步都跑测试确认。", ["重构"], 60],
   ["grok", "Grok 示例提示词", "Grok 的示例。", ["示例"], 20],
   ["zcode", "全栈脚手架", "为新项目生成最小可运行的全栈脚手架，并解释每个目录的用途。", ["脚手架"], 30],
+  ["pi", "极简编码助手", "回答简短；改动前先读相关文件，改完运行测试。", ["编码"], 45],
 ];
 
 interface Store {
@@ -305,7 +306,7 @@ async function handle(cmd: string, args: Record<string, any> = {}): Promise<unkn
     case "get_startup_report":
       return { firstRun: false, candidates: [], recovery: null, sidecar: { pythonRequired: false, tools: [] } };
     case "list_tools":
-      return { tools: (["claude", "codex", "grok", "zcode"] as ToolId[]).map((id) => ({ id, name: id, adapterVersion: "mock", available: true, unavailableReason: null, supportedScopes: ["user"], cliPath: null })) };
+      return { tools: (["claude", "codex", "grok", "zcode", "pi"] as ToolId[]).map((id) => ({ id, name: id, adapterVersion: "mock", available: true, unavailableReason: null, supportedScopes: ["user"], cliPath: null })) };
     case "harness_state": {
       const live = store.live[args.tool as ToolId];
       return delay({ tool: args.tool, deployed: Boolean(live), error: null, promptId: live?.id ?? null, promptTitle: live?.id ? live.title : null }, 380);
@@ -377,7 +378,7 @@ async function handle(cmd: string, args: Record<string, any> = {}): Promise<unkn
       const memories = tool === "codex" && !codexMemoriesGone ? { path: "/Users/you/.codex/memories", files: 2778, bytes: 41_943_040 } : null;
       const agentRunning = tool === "codex" && new URLSearchParams(window.location.search).has("codexrunning");
       const root = tool === "zcode" ? ".zcode" : `.${tool}`;
-      const extras = [
+      const extras = tool === "pi" ? [] : [
         { name: `${root}/rules`, path: `/Users/you/${root}/rules`, files: 4, bytes: 6_144, kind: "saved" },
         { name: `${root}/${tool === "claude" ? "settings.json" : "config.toml"}`, path: `/Users/you/${root}/config`, files: 1, bytes: 1_180, kind: "saved-without-login" },
         { name: `${root}/sessions`, path: `/Users/you/${root}/sessions`, files: 312, bytes: 12_582_912, kind: "erased" },

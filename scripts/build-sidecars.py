@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Freeze the four Keysmith CLIs into platform-native sidecars, and build the input
+"""Freeze the five Keysmith CLIs into platform-native sidecars, and build the input
 rewrite relay (Rust) next to them.
 
 Users of the packaged app do not need Python. Dev `tauri dev` and cargo tests
@@ -91,6 +91,12 @@ SPECS = [
             (VENDOR / "zcode" / "zcode-keysmith.py", "."),
         ],
         "must_contain": ["zcode-keysmith.py"],
+        "hidden": [],
+    },
+    {
+        "name": "keysmith-pi",
+        "script": VENDOR / "pi" / "pi-keysmith.py",
+        "datas": [VENDOR / "pi" / "examples" / "system-prompt.md"],
         "hidden": [],
     },
 ]

@@ -61,7 +61,7 @@ pub enum AdapterCommand {
         append_file: Option<PathBuf>,
         #[serde(default)]
         max_tokens: Option<u64>,
-        /// Grok envelope `confirmation_token`. Unused by the other tools.
+        /// Grok / pi envelope `confirmation_token`. Unused by the other tools.
         #[serde(default)]
         expected_preview_token: Option<String>,
     },

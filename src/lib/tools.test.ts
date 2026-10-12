@@ -29,6 +29,7 @@ describe("scope support per tool", () => {
     expect(scopesForTool("codex")).toEqual(["user"]);
     expect(scopesForTool("grok")).toEqual(["user"]);
     expect(scopesForTool("zcode")).toEqual(["user"]);
+    expect(scopesForTool("pi")).toEqual(["user"]);
   });
 
   it("never fabricates project / local for non-claude tools", () => {
@@ -36,6 +37,7 @@ describe("scope support per tool", () => {
     expect(scopesForTool("codex", reported)).toEqual(["user"]);
     expect(scopesForTool("grok", reported)).toEqual(["user"]);
     expect(scopesForTool("zcode", reported)).toEqual(["user"]);
+    expect(scopesForTool("pi", reported)).toEqual(["user"]);
   });
 
   it("filters claude scopes down to what the adapter reports", () => {

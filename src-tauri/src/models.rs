@@ -15,14 +15,16 @@ pub enum ToolKind {
     Codex,
     Grok,
     Zcode,
+    Pi,
 }
 
 impl ToolKind {
-    pub const ALL: [ToolKind; 4] = [
+    pub const ALL: [ToolKind; 5] = [
         ToolKind::Claude,
         ToolKind::Codex,
         ToolKind::Grok,
         ToolKind::Zcode,
+        ToolKind::Pi,
     ];
 
     pub fn as_str(self) -> &'static str {
@@ -31,6 +33,7 @@ impl ToolKind {
             Self::Codex => "codex",
             Self::Grok => "grok",
             Self::Zcode => "zcode",
+            Self::Pi => "pi",
         }
     }
 
@@ -40,6 +43,7 @@ impl ToolKind {
             Self::Codex => "0.6.0",
             Self::Grok => "0.8.0",
             Self::Zcode => "0.3.2",
+            Self::Pi => "0.2.0",
         }
     }
 
@@ -49,6 +53,7 @@ impl ToolKind {
             Self::Codex => "KEYSMITH_SWITCH_CODEX_CLI",
             Self::Grok => "KEYSMITH_SWITCH_GROK_CLI",
             Self::Zcode => "KEYSMITH_SWITCH_ZCODE_CLI",
+            Self::Pi => "KEYSMITH_SWITCH_PI_CLI",
         }
     }
 
@@ -58,6 +63,7 @@ impl ToolKind {
             Self::Codex => "codex/codex-instruct.py",
             Self::Grok => "grok/grok-keysmith.py",
             Self::Zcode => "zcode/zcode-keysmith.py",
+            Self::Pi => "pi/pi-keysmith.py",
         }
     }
 
@@ -67,6 +73,7 @@ impl ToolKind {
             Self::Codex => "gpt-unrestricted",
             Self::Grok => "99-keysmith",
             Self::Zcode => "system-role",
+            Self::Pi => "system-prompt",
         }
     }
 
@@ -108,6 +115,7 @@ impl FromStr for ToolKind {
             "codex" => Ok(Self::Codex),
             "grok" => Ok(Self::Grok),
             "zcode" => Ok(Self::Zcode),
+            "pi" => Ok(Self::Pi),
             other => Err(Error::invalid(format!("unknown tool: {other}"))),
         }
     }

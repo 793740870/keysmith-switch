@@ -36,6 +36,7 @@
       "binaries/keysmith-codex",
       "binaries/keysmith-grok",
       "binaries/keysmith-zcode",
+      "binaries/keysmith-pi",
       "binaries/keysmith-relay"
     ],
     "resources": [

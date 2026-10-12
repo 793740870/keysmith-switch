@@ -71,8 +71,13 @@ assert_sidecar_previews() {
     --name bundle-smoke --dry-run --grok-dir "$smoke_home/.grok" >/dev/null
   HOME="$smoke_home" "$MACOS/keysmith-zcode" doctor \
     --managed-dir "$smoke_home/.zcode-keysmith" >/dev/null
+  # pi never creates its agent folder; an empty one previews cleanly and must stay empty.
+  mkdir -p "$smoke_home/.pi/agent"
+  HOME="$smoke_home" "$MACOS/keysmith-pi" --file "$prompt" --name bundle-smoke \
+    --pi-dir "$smoke_home/.pi/agent" --dry-run --json --lang en >/dev/null
 
-  if [[ -e "$smoke_home/.claude" || -e "$smoke_home/.grok" || -e "$smoke_home/.zcode-keysmith" ]]; then
+  if [[ -e "$smoke_home/.claude" || -e "$smoke_home/.grok" || -e "$smoke_home/.zcode-keysmith" \
+    || -n "$(ls -A "$smoke_home/.pi/agent")" ]]; then
     echo "sidecar preview smoke unexpectedly wrote managed configuration" >&2
     rm -rf "$smoke_home"
     exit 1
@@ -92,7 +97,7 @@ if [[ "$identifier" != "com.jia-ethan.keysmith-switch" ]]; then
 fi
 
 assert_arm64_executable "$MACOS/keysmith-switch" "main executable"
-for name in keysmith-claude keysmith-codex keysmith-grok keysmith-zcode; do
+for name in keysmith-claude keysmith-codex keysmith-grok keysmith-zcode keysmith-pi; do
   if [[ -x "$MACOS/$name" ]]; then
     assert_arm64_executable "$MACOS/$name" "sidecar $name"
     assert_sidecar_runs "$MACOS/$name" "sidecar $name"

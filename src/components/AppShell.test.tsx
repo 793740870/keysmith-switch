@@ -41,9 +41,9 @@ function renderShell(page: AppPage, advancedEnabled = false, autoCheck = false) 
 }
 
 describe("AppShell tool navigation", () => {
-  it("renders all four tool entries", () => {
+  it("renders all five tool entries", () => {
     renderShell({ kind: "tool", tool: "claude" });
-    for (const tool of ["claude", "codex", "grok", "zcode"]) {
+    for (const tool of ["claude", "codex", "grok", "zcode", "pi"]) {
       expect(screen.getByTestId(`nav-${tool}`)).toBeInTheDocument();
     }
   });
@@ -54,6 +54,7 @@ describe("AppShell tool navigation", () => {
     expect(screen.getByTestId("nav-claude")).not.toHaveAttribute("aria-current");
     expect(screen.getByTestId("nav-grok")).not.toHaveAttribute("aria-current");
     expect(screen.getByTestId("nav-zcode")).not.toHaveAttribute("aria-current");
+    expect(screen.getByTestId("nav-pi")).not.toHaveAttribute("aria-current");
   });
 
   it("routes tool clicks through onNavigate", () => {
@@ -80,7 +81,7 @@ describe("AppShell tool navigation", () => {
 
   it("does not mark any tool active on the settings page", () => {
     renderShell({ kind: "settings" });
-    for (const tool of ["claude", "codex", "grok", "zcode"]) {
+    for (const tool of ["claude", "codex", "grok", "zcode", "pi"]) {
       expect(screen.getByTestId(`nav-${tool}`)).not.toHaveAttribute("aria-current");
     }
     expect(screen.getByTestId("nav-settings")).toBeInTheDocument();
@@ -89,7 +90,7 @@ describe("AppShell tool navigation", () => {
   it("keeps every entry on the rail without an overflow menu", () => {
     renderShell({ kind: "tool", tool: "claude" }, true);
     expect(screen.queryByTestId("nav-more")).not.toBeInTheDocument();
-    expect(screen.getByRole("navigation")).toContainElement(screen.getByTestId("nav-zcode"));
+    expect(screen.getByRole("navigation")).toContainElement(screen.getByTestId("nav-pi"));
     expect(screen.getByRole("navigation")).toContainElement(screen.getByTestId("nav-settings"));
   });
 

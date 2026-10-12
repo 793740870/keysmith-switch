@@ -5,12 +5,12 @@ import { ConfirmDialog } from "../components/ConfirmDialog";
 import { IconSwap } from "../components/icons";
 import { Switch } from "../components/ui";
 import type { ToastApi } from "../hooks/useToasts";
-import type { RewriteRule, RewriteView, RuleTable, ToolId } from "../types";
+import type { RewriteRule, RewriteView, RuleTable } from "../types";
 import { AgentList } from "./rewrite/AgentList";
-import { AGENT_NAMES, SWITCH_KEY, agentRows } from "./rewrite/agents";
+import { AGENT_NAMES, SWITCH_KEY, agentRows, type RewriteAgent } from "./rewrite/agents";
 import { RuleTables } from "./rewrite/RuleTables";
 
-function connectCall(tool: ToolId): (() => Promise<RewriteView>) | undefined {
+function connectCall(tool: RewriteAgent): (() => Promise<RewriteView>) | undefined {
   switch (tool) {
     case "codex":
       return api.rewriteConnectCodex;
@@ -25,7 +25,7 @@ function connectCall(tool: ToolId): (() => Promise<RewriteView>) | undefined {
   }
 }
 
-function disconnectCall(tool: ToolId): (() => Promise<RewriteView>) | undefined {
+function disconnectCall(tool: RewriteAgent): (() => Promise<RewriteView>) | undefined {
   switch (tool) {
     case "codex":
       return api.rewriteDisconnectCodex;
@@ -48,8 +48,8 @@ export function RewritePage({ toast }: { toast: ToastApi }) {
   const { t } = useTranslation();
   const [view, setView] = useState<RewriteView | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
-  const [connecting, setConnecting] = useState<ToolId | null>(null);
-  const [disconnecting, setDisconnecting] = useState<ToolId | null>(null);
+  const [connecting, setConnecting] = useState<RewriteAgent | null>(null);
+  const [disconnecting, setDisconnecting] = useState<RewriteAgent | null>(null);
   const [reviewing, setReviewing] = useState<RuleTable | null>(null);
 
   const load = useCallback(async () => {
@@ -80,7 +80,7 @@ export function RewritePage({ toast }: { toast: ToastApi }) {
 
   const rows = useMemo(() => (view ? agentRows(view) : []), [view]);
   const packs = useMemo(() => view?.tables.filter((table) => table.kind === "pack") ?? [], [view]);
-  const rowFor = (tool: ToolId | null) => rows.find((row) => row.tool === tool);
+  const rowFor = (tool: RewriteAgent | null) => rows.find((row) => row.tool === tool);
 
   const move = (index: number, delta: number) => {
     const ids = packs.map((table) => table.id);
@@ -90,7 +90,7 @@ export function RewritePage({ toast }: { toast: ToastApi }) {
     void run("reorder", () => api.rewriteReorderTables(ids));
   };
 
-  const connect = (tool: ToolId) => {
+  const connect = (tool: RewriteAgent) => {
     const action = connectCall(tool);
     if (!action) return;
     void run(`connect:${tool}`, action, t("rewrite.connect.connected", { agent: AGENT_NAMES[tool] })).then(() =>

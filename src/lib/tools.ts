@@ -38,6 +38,15 @@ export const TOOL_CATALOG: ToolInfo[] = [
     supportedScopes: ["user"],
     cliPath: null,
   },
+  {
+    id: "pi",
+    name: "pi",
+    adapterVersion: "0.2.0",
+    available: true,
+    unavailableReason: null,
+    supportedScopes: ["user"],
+    cliPath: null,
+  },
 ];
 
 export function isToolId(value: string): value is ToolId {

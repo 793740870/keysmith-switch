@@ -1,9 +1,12 @@
 import type { RewriteView, ToolId } from "../../types";
 
-/** The agents in the order the page lists them. */
-export const REWRITE_AGENTS: ToolId[] = ["claude", "codex", "zcode", "grok"];
+/** The agents input rewrite can connect to. pi has no relay connection. */
+export type RewriteAgent = Exclude<ToolId, "pi">;
 
-export const AGENT_NAMES: Record<ToolId, string> = {
+/** The agents in the order the page lists them. */
+export const REWRITE_AGENTS: RewriteAgent[] = ["claude", "codex", "zcode", "grok"];
+
+export const AGENT_NAMES: Record<RewriteAgent, string> = {
   claude: "Claude Code",
   codex: "Codex",
   grok: "Grok Build",
@@ -14,7 +17,7 @@ export type AgentStatus = "active" | "paused" | "unlinked" | "bypassed" | "down"
 
 /** What one agent row shows: state, what connecting writes, where requests go, why not. */
 export interface AgentRow {
-  tool: ToolId;
+  tool: RewriteAgent;
   status: AgentStatus;
   /** The per-agent switch; shown only once the agent is connected. */
   enabled: boolean;
@@ -52,7 +55,7 @@ export function agentRows(view: RewriteView): AgentRow[] {
   const zcodeLinked = zcode.link.state === "linked";
   const grok = view.grok;
   const grokLinked = grok.link.state === "linked";
-  const rows: Record<ToolId, AgentRow> = {
+  const rows: Record<RewriteAgent, AgentRow> = {
     codex: {
       tool: "codex",
       status: status(view, view.codexEnabled, codexLinked, codex.link.state === "bypassed", codex.service.running),
@@ -130,7 +133,7 @@ function hostOf(url: string): string | null {
 }
 
 /** The switch each agent row sends to rewrite_set_switches. */
-export const SWITCH_KEY: Record<ToolId, "codexEnabled" | "claudeEnabled" | "grokEnabled" | "zcodeEnabled"> = {
+export const SWITCH_KEY: Record<RewriteAgent, "codexEnabled" | "claudeEnabled" | "grokEnabled" | "zcodeEnabled"> = {
   claude: "claudeEnabled",
   codex: "codexEnabled",
   grok: "grokEnabled",

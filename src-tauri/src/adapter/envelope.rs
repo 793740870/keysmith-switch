@@ -81,7 +81,7 @@ pub struct Envelope {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
     pub redacted_stderr: String,
-    /// Grok CLI `confirmation_token`. Other tools leave this empty.
+    /// Grok / pi CLI `confirmation_token`. Other tools leave this empty.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub confirmation_token: Option<String>,
     /// Grok uninstall: the managed config backup is lost and an uninstall that keeps

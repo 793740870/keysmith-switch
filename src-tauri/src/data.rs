@@ -196,6 +196,16 @@ fn native_prompt_files(tool: ToolKind, home: &Path) -> Vec<PathBuf> {
         ],
         ToolKind::Grok => vec![home.join(".grok").join("rules")],
         ToolKind::Zcode => vec![home.join(".zcode-keysmith")],
+        // pi's agent folder also holds AGENTS.md, skills and sessions; only the system prompt
+        // pi-keysmith deploys is a candidate.
+        ToolKind::Pi => {
+            let system = home.join(".pi").join("agent").join("SYSTEM.md");
+            return if system.is_file() {
+                vec![system]
+            } else {
+                Vec::new()
+            };
+        }
     };
     let mut files = Vec::new();
     for root in roots {
@@ -395,6 +405,8 @@ fn infer_tool_from_path(path: &Path) -> Option<ToolKind> {
         Some(ToolKind::Grok)
     } else if text.contains("zcode") {
         Some(ToolKind::Zcode)
+    } else if text.contains("/.pi/") || text.contains("\\.pi\\") {
+        Some(ToolKind::Pi)
     } else {
         None
     }

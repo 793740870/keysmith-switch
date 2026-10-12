@@ -25,6 +25,13 @@ fn expected_versions_match_the_vendored_adapters() {
     assert_pinned(ToolKind::Codex, &vendored("codex/VERSION"));
     assert_pinned(ToolKind::Grok, &vendored("grok/VERSION"));
     assert_pinned(ToolKind::Zcode, &vendored("zcode/VERSION"));
+    assert_pinned(ToolKind::Pi, &vendored("pi/VERSION"));
+    let pi = vendored("pi/pi-keysmith.py");
+    assert!(
+        pi.lines()
+            .any(|line| line == format!("__version__ = \"{}\"", ToolKind::Pi.expected_version())),
+        "pi-keysmith.py declares another __version__"
+    );
     let claude = vendored("claude/claude-instruct.py");
     let line = claude
         .lines()

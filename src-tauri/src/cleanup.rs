@@ -301,6 +301,9 @@ fn table(tool: ToolKind) -> Option<&'static Table> {
         ToolKind::Codex => Some(&CODEX),
         ToolKind::Grok => Some(&GROK),
         ToolKind::Zcode => Some(&ZCODE),
+        // pi keeps nothing for Switch to clear besides its deployment, which the adapter's own
+        // uninstall takes away. Its sessions, settings and AGENTS.md are left as they are.
+        ToolKind::Pi => None,
     }
 }
 
@@ -712,6 +715,7 @@ fn agent_running(tool: ToolKind, opts: &AdapterOptions) -> bool {
                 ToolKind::Grok => base == "grok",
                 // The app, its helpers and its command line all hold the data.
                 ToolKind::Zcode => base.starts_with("zcode"),
+                ToolKind::Pi => base == "pi",
             }
         })
     })
