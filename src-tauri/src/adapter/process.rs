@@ -73,6 +73,7 @@ pub fn sidecar_basename(tool: ToolKind) -> &'static str {
         ToolKind::Codex => "keysmith-codex",
         ToolKind::Grok => "keysmith-grok",
         ToolKind::Zcode => "keysmith-zcode",
+        ToolKind::Pi => "keysmith-pi",
     }
 }
 
@@ -196,6 +197,7 @@ fn script_basename(tool: ToolKind) -> &'static str {
         ToolKind::Codex => "codex-instruct.py",
         ToolKind::Grok => "grok-keysmith.py",
         ToolKind::Zcode => "zcode-keysmith.py",
+        ToolKind::Pi => "pi-keysmith.py",
     }
 }
 

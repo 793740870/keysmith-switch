@@ -6,7 +6,7 @@
 
 **一个桌面 App，管好你所有 AI 编程 Agent 的提示词。**
 
-粘贴提示词 → 先看部署计划 → 确认后部署到 **Claude Code** · **Codex** · **Grok Build** · **ZCode**
+粘贴提示词 → 先看部署计划 → 确认后部署到 **Claude Code** · **Codex** · **Grok Build** · **ZCode** · **pi**
 
 [![Latest release](https://img.shields.io/github/v/release/Jia-Ethan/keysmith-switch-releases?label=%E7%A8%B3%E5%AE%9A%E7%89%88&color=C8643B&style=flat-square)](https://github.com/Jia-Ethan/keysmith-switch-releases/releases/latest)
 [![Platforms](https://img.shields.io/badge/macOS%20%C2%B7%20Windows-555?style=flat-square)](#-下载)
@@ -127,6 +127,10 @@
 <img src="docs/images/agents/zcode.png" width="48" height="48" alt="ZCode" />
 <br /><b>ZCode</b>
 </td>
+<td align="center" width="140">
+<img src="docs/images/agents/pi.svg" width="48" height="48" alt="pi" />
+<br /><b>pi</b>
+</td>
 </tr>
 </table>
 
@@ -195,7 +199,7 @@ flowchart LR
 
 <br />
 
-- 只动 Switch 自己的部署、用户级的这一个记忆文件，以及（勾选后）Codex 的记忆文件夹，不碰项目目录里的任何文件。Grok Build、ZCode 没有已知的记忆文件，清理时只停用部署。Codex 的数据库、会话等其他文件不会动。
+- 只动 Switch 自己的部署、用户级的这一个记忆文件，以及（勾选后）Codex 的记忆文件夹，不碰项目目录里的任何文件。Grok Build、ZCode、pi 没有已知的记忆文件，清理时只停用部署；pi 的 `AGENTS.md`、`APPEND_SYSTEM.md`、设置和会话都不会动。Codex 的数据库、会话等其他文件不会动。
 - 版本保存在 `~/.keysmith-switch/snapshots/`：当时部署的提示词正文、记忆文件的原样字节，以及（如果清理了）整个 `memories` 文件夹。
 - 记忆文件夹是**整体移动**进版本里，不复制也不删除，所以体积再大也不会丢文件；清理后会留下一个空的 `memories` 文件夹。
 - 回滚会重新部署当时的提示词，把记忆文件恢复成原样，并把 `memories` 文件夹复制回去（版本本身保持完整，可以再次回滚）。回滚前现有的文件夹也会先移进一个新版本。
@@ -302,7 +306,7 @@ npx tauri build --target aarch64-apple-darwin --config src-tauri/tauri.preview.m
 
 每个 Agent 的适配器（`third_party/keysmith/`）和 App 要求的版本（`ToolKind::expected_version`）必须一致，否则确认部署会被拒绝。`src-tauri/tests/version_pins.rs` 在两者不一致时让测试失败。升级适配器时，要同时修改这两处，以及 `src-tauri/tests/fixtures/cli/` 里的默认版本号。
 
-当前发行包仍包含四个 legacy adapter sidecar，用于兼容 Claude Code、Codex、Grok Build 与 ZCode 的目标配置协议。它们是执行实现，不是快速部署的默认提示词来源；快速部署不会自动抓取这些仓库的提示词，也不要求用户安装对应的 Keysmith 仓库。
+当前发行包包含五个 legacy adapter sidecar，用于兼容 Claude Code、Codex、Grok Build、ZCode 与 pi 的目标配置协议。pi 只管理全局 `~/.pi/agent/SYSTEM.md`，并且 Switch 不会创建这个目录：没装过 pi 时部署会被拦下并说明原因。它们是执行实现，不是快速部署的默认提示词来源；快速部署不会自动抓取这些仓库的提示词，也不要求用户安装对应的 Keysmith 仓库。
 
 `third_party/keysmith/` 中的版本锁只约束 legacy adapter artifact 的构建与审计。后续 Agent registry 会把这些 artifact 迁移到统一的 adapter manifest；用户提示词库和适配器供应链保持独立。
 

@@ -3,8 +3,7 @@ import { useTranslation } from "react-i18next";
 import { IconChevronDown } from "../../components/icons";
 import { ToolLogo } from "../../components/ToolLogos";
 import { Button, Switch, cx } from "../../components/ui";
-import type { ToolId } from "../../types";
-import { AGENT_NAMES, type AgentRow, type AgentStatus } from "./agents";
+import { AGENT_NAMES, type AgentRow, type AgentStatus, type RewriteAgent } from "./agents";
 
 const DOT: Record<AgentStatus, string> = {
   active: "bg-success",
@@ -35,9 +34,9 @@ export function AgentList({
   rows: AgentRow[];
   masterOn: boolean;
   busy: string | null;
-  onToggle: (tool: ToolId, enabled: boolean) => void;
-  onConnect: (tool: ToolId) => void;
-  onDisconnect: (tool: ToolId) => void;
+  onToggle: (tool: RewriteAgent, enabled: boolean) => void;
+  onConnect: (tool: RewriteAgent) => void;
+  onDisconnect: (tool: RewriteAgent) => void;
 }) {
   const { t } = useTranslation();
   return (

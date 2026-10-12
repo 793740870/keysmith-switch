@@ -25,6 +25,7 @@ pub fn normalize(
         ToolKind::Codex => normalize_codex(command, captured, envelope),
         ToolKind::Grok => normalize_grok(command, captured, envelope),
         ToolKind::Zcode => normalize_zcode(command, captured, envelope),
+        ToolKind::Pi => normalize_pi(command, captured, envelope),
     };
     // A CLI that stopped without a reason in its output still gave one on stderr.
     if !envelope.ok
@@ -325,6 +326,275 @@ fn normalize_grok(
         envelope.ok = false;
     }
     envelope
+}
+
+const PI_SCHEMA: &str = "pi-keysmith.envelope.v1";
+const PI_MIN_VERSION: (u64, u64, u64) = (0, 2, 0);
+
+/// `pi-keysmith.envelope.v1`. Same shape as Grok's envelope, different wire: the state is in
+/// `status.*` (not `result.*`), `ok` is false for a valid `conflict` / `recovery-required`
+/// status, and every diagnostic is `"<code>: <sentence>"`.
+fn normalize_pi(command: &AdapterCommand, captured: &Captured, mut envelope: Envelope) -> Envelope {
+    if matches!(command, AdapterCommand::Version) {
+        // argparse text (`pi-keysmith.py 0.2.0`), not an envelope.
+        if let Some(version) = captured
+            .stdout
+            .lines()
+            .next()
+            .and_then(|line| line.split_whitespace().last())
+        {
+            envelope.adapter_version = Some(normalize_version(version));
+        }
+        envelope.ok = captured.exit_code == 0;
+        return envelope;
+    }
+    let json = match parse_json(&captured.stdout) {
+        Ok(value) => value,
+        Err(error) => return envelope.fail(error),
+    };
+    if json.get("schema").and_then(Value::as_str) != Some(PI_SCHEMA) {
+        return envelope.fail(format!("pi adapter did not answer with {PI_SCHEMA}"));
+    }
+    let version = json.get("version").and_then(Value::as_str).unwrap_or("");
+    if !semver_at_least(version, PI_MIN_VERSION) {
+        return envelope.fail(format!(
+            "pi adapter {version} is too old; Keysmith Switch needs 0.2.0 or newer"
+        ));
+    }
+    envelope.adapter_version = Some(normalize_version(version));
+    envelope.ok = json_bool(&json, "ok").unwrap_or(false);
+    envelope.exit_code = json
+        .get("exit_code")
+        .and_then(Value::as_i64)
+        .map(|code| code as i32)
+        .unwrap_or(captured.exit_code);
+    envelope.preview = json_bool(&json, "preview").unwrap_or(envelope.preview);
+
+    let target = json.get("target").cloned().unwrap_or(Value::Null);
+    if let Some(dir) = target.get("pi_dir").and_then(Value::as_str) {
+        if target.get("scope").and_then(Value::as_str) != Some("user") {
+            return envelope.fail("pi adapter reported a scope other than user");
+        }
+        envelope.target_paths.push(TargetPath {
+            path: dir.to_string(),
+            role: "config-root".into(),
+            exists: json
+                .pointer("/status/nodes/pi_dir/kind")
+                .and_then(Value::as_str)
+                == Some("directory"),
+        });
+    }
+
+    // Every diagnostic, keyed by its code (the part before the first colon).
+    let diagnostics: Vec<(String, String)> = json
+        .get("diagnostics")
+        .and_then(Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(Value::as_str)
+                .map(|item| {
+                    let code = item.split(':').next().unwrap_or("").trim().to_string();
+                    (code, redact_text(item))
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    // A bare code reads as its diagnostic sentence when the adapter gave one.
+    let explain = |code: &str| -> String {
+        let base = code.split(':').next().unwrap_or(code);
+        diagnostics
+            .iter()
+            .find(|(known, _)| known == base)
+            .map(|(_, text)| text.clone())
+            .unwrap_or_else(|| redact_text(code))
+    };
+    envelope.warnings = diagnostics.iter().map(|(_, text)| text.clone()).collect();
+
+    let status = json.get("status").cloned().unwrap_or(Value::Null);
+    if let Some(state) = status.get("state").and_then(Value::as_str) {
+        envelope.status = match state {
+            "not-installed" => ToolStatus::NotInstalled,
+            "conflict" => ToolStatus::Conflict,
+            "recovery-required" => ToolStatus::RecoveryRequired,
+            // A hand-edited SYSTEM.md does not stop a deploy: pi backs it up and replaces it.
+            // Reported on a deploy plan, it would read as a repair to make first.
+            "drift"
+                if matches!(
+                    command,
+                    AdapterCommand::PlanActivate { .. } | AdapterCommand::Activate { .. }
+                ) =>
+            {
+                ToolStatus::Inactive
+            }
+            "drift" => ToolStatus::Drift,
+            "active-aligned" => ToolStatus::Active,
+            other => return envelope.fail(format!("pi adapter reported unknown state {other}")),
+        };
+    }
+    envelope.recovery_required = status
+        .get("recovery_required")
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+        || envelope.status == ToolStatus::RecoveryRequired;
+    envelope.conflicts = status
+        .get("conflicts")
+        .and_then(Value::as_array)
+        .map(string_values)
+        .unwrap_or_default();
+    for (key, role) in [("system", "system_file"), ("manifest", "manifest")] {
+        if let Some(node) = status.pointer(&format!("/nodes/{key}")) {
+            if let Some(path) = node.get("path").and_then(Value::as_str) {
+                envelope.target_paths.push(TargetPath {
+                    path: path.to_string(),
+                    role: role.into(),
+                    exists: node.get("kind").and_then(Value::as_str) == Some("regular"),
+                });
+            }
+        }
+    }
+    envelope.current_fingerprint = status
+        .pointer("/nodes/system/fingerprint/sha256")
+        .and_then(Value::as_str)
+        .map(str::to_string);
+    if let Some(residue) = status.get("residue") {
+        let left: Vec<String> = ["journals", "cleanup_markers", "temp_files"]
+            .iter()
+            .flat_map(|key| {
+                residue
+                    .get(*key)
+                    .and_then(Value::as_array)
+                    .map(string_values)
+                    .unwrap_or_default()
+            })
+            .collect();
+        if !left.is_empty() {
+            envelope.recovery_required = true;
+            envelope
+                .warnings
+                .push(format!("unfinished transaction left: {}", left.join(", ")));
+        }
+    }
+
+    let plan = json.get("plan").cloned().unwrap_or(Value::Null);
+    let blockers: Vec<String> = match plan.get("blockers").and_then(Value::as_array) {
+        Some(items) => string_values(items),
+        // A status has no plan: what stops a write is in the status itself.
+        None => match command {
+            AdapterCommand::PlanDeactivate { .. } | AdapterCommand::Deactivate { .. } => {
+                status_blockers(&status, "uninstall")
+            }
+            AdapterCommand::PlanActivate { .. } | AdapterCommand::Activate { .. } => {
+                status_blockers(&status, "deploy")
+            }
+            _ => envelope.conflicts.clone(),
+        },
+    };
+    envelope.blockers = blockers.iter().map(|code| explain(code)).collect();
+    envelope.confirmation_token = plan
+        .get("confirmation_token")
+        .and_then(Value::as_str)
+        .filter(|token| {
+            token.len() == 64
+                && token
+                    .chars()
+                    .all(|ch| ch.is_ascii_digit() || ('a'..='f').contains(&ch))
+        })
+        .map(str::to_string);
+    let root = target.get("pi_dir").and_then(Value::as_str);
+    if let Some(writes) = plan.get("writes").and_then(Value::as_array) {
+        for write in writes {
+            let Some(name) = write.get("path").and_then(Value::as_str) else {
+                continue;
+            };
+            let detail = ["backup", "source", "archive"]
+                .iter()
+                .find_map(|key| {
+                    write
+                        .get(*key)
+                        .and_then(Value::as_str)
+                        .map(|value| format!("{key}: {value}"))
+                })
+                .unwrap_or_default();
+            envelope.planned_files.push(PlannedFile {
+                path: root
+                    .map(|dir| std::path::Path::new(dir).join(name).display().to_string())
+                    .unwrap_or_else(|| name.to_string()),
+                action: write
+                    .get("action")
+                    .and_then(Value::as_str)
+                    .unwrap_or("write")
+                    .to_string(),
+                detail: redact_text(&detail),
+            });
+        }
+    }
+
+    // Refused before or while writing: say why. Exits 2, 3 and 5 changed nothing; only 4 may
+    // have left a half-done write for recover.
+    if !envelope.ok {
+        let has = |code: &str| diagnostics.iter().any(|(known, _)| known == code);
+        if has("preview-token-mismatch") {
+            envelope.error = Some("pi changed since the preview; preview again".into());
+        } else if has("lock-busy") {
+            envelope.error = Some("another pi-keysmith run is busy; try again".into());
+        } else if has("write-failed") || envelope.exit_code == 4 {
+            envelope.recovery_required = true;
+            envelope.error = Some("pi write failed partway; recover first".into());
+        }
+        if envelope.blockers.is_empty() {
+            envelope.blockers = diagnostics
+                .iter()
+                .filter(|(code, _)| code != "windows-beta")
+                .map(|(_, text)| text.clone())
+                .collect();
+        }
+    }
+
+    if matches!(
+        command,
+        AdapterCommand::Doctor | AdapterCommand::Status { .. }
+    ) {
+        envelope.doctor.ok = envelope.ok && !envelope.recovery_required;
+        envelope.doctor.checks.push(DoctorCheck {
+            name: "state".into(),
+            ok: envelope.ok,
+            detail: Some(envelope.status.as_str().to_string()),
+        });
+        for (name, key, kind) in [
+            ("deployable", "deployable", "deploy"),
+            ("uninstall_ready", "uninstall_ready", "uninstall"),
+        ] {
+            let blocked = status_blockers(&status, kind);
+            envelope.doctor.checks.push(DoctorCheck {
+                name: name.into(),
+                ok: json_bool(&status, key).unwrap_or(false),
+                detail: (!blocked.is_empty()).then(|| blocked.join(", ")),
+            });
+        }
+    }
+    envelope
+}
+
+fn status_blockers(status: &Value, kind: &str) -> Vec<String> {
+    status
+        .pointer(&format!("/blockers/{kind}"))
+        .and_then(Value::as_array)
+        .map(string_values)
+        .unwrap_or_default()
+}
+
+fn semver_at_least(version: &str, min: (u64, u64, u64)) -> bool {
+    let mut parts = normalize_version(version)
+        .split(['.', '-', '+'])
+        .map(|part| part.parse::<u64>())
+        .collect::<Vec<_>>()
+        .into_iter();
+    let mut next = || parts.next().and_then(|part| part.ok());
+    match (next(), next(), next()) {
+        (Some(major), Some(minor), Some(patch)) => (major, minor, patch) >= min,
+        _ => false,
+    }
 }
 
 fn normalize_codex(

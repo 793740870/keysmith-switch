@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Launch the packaged Preview app with a throwaway HOME. Does not read or write
-# the operator's real ~/.claude ~/.codex ~/.grok ~/.zcode-keysmith or
+# the operator's real ~/.claude ~/.codex ~/.grok ~/.zcode-keysmith ~/.pi or
 # ~/.keysmith-switch.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"

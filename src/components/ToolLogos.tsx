@@ -2,8 +2,9 @@ import type { ToolId } from "../types";
 import claudeSvg from "../assets/claude.svg";
 import codexSvg from "../assets/codex.svg";
 import zcodePng from "../assets/zcode.png";
+import piSvg from "../assets/pi.svg";
 
-/** Tool brand icons. Using official-sourced SVG for Claude/Codex/Grok, the official app icon for ZCode. */
+/** Tool brand icons. Using official-sourced SVG for Claude/Codex/Grok/pi, the official app icon for ZCode. */
 export function ToolLogo({ tool, size = 20 }: { tool: ToolId; size?: number }) {
   switch (tool) {
     case "claude":
@@ -33,6 +34,8 @@ export function ToolLogo({ tool, size = 20 }: { tool: ToolId; size?: number }) {
       return <GrokMark size={size} />;
     case "zcode":
       return <ZcodeMark size={size} />;
+    case "pi":
+      return <img src={piSvg} width={size} height={size} alt="" aria-hidden="true" className="shrink-0" />;
   }
 }
 

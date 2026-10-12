@@ -21,6 +21,7 @@ pub fn prepare(
         ToolKind::Codex => codex_args(command, isolated_home),
         ToolKind::Grok => grok_args(command, isolated_home),
         ToolKind::Zcode => zcode_args(command, isolated_home),
+        ToolKind::Pi => pi_args(command, isolated_home),
     }
 }
 
@@ -410,19 +411,113 @@ fn zcode_args(command: &AdapterCommand, home: Option<&Path>) -> Result<PreparedC
 }
 
 fn push_grok_token(args: &mut Vec<String>, token: Option<&str>) -> Result<()> {
+    push_preview_token(args, token, "grok")
+}
+
+fn push_preview_token(args: &mut Vec<String>, token: Option<&str>, tool: &str) -> Result<()> {
     let Some(token) = token.map(str::trim).filter(|value| !value.is_empty()) else {
-        return Err(Error::invalid(
-            "grok confirm requires the preview confirmation token",
-        ));
+        return Err(Error::invalid(format!(
+            "{tool} confirm requires the preview confirmation token"
+        )));
     };
     if token.len() != 64 || !token.chars().all(|ch| ch.is_ascii_hexdigit()) {
-        return Err(Error::invalid(
-            "grok preview token must be 64 hex characters",
-        ));
+        return Err(Error::invalid(format!(
+            "{tool} preview token must be 64 hex characters"
+        )));
     }
     args.push("--expected-preview-token".into());
     args.push(token.to_ascii_lowercase());
     Ok(())
+}
+
+/// pi-keysmith with `--json` needs `--pi-dir` on every call, as an absolute path: unlike Grok
+/// it never falls back to a directory of its own choosing.
+fn pi_args(command: &AdapterCommand, home: Option<&Path>) -> Result<PreparedCommand> {
+    let mut args: Vec<String> = Vec::new();
+    let mut preview = true;
+    let mut token = None;
+    match command {
+        AdapterCommand::Version => {
+            return Ok(PreparedCommand {
+                args: vec!["--version".into()],
+                preview: true,
+            });
+        }
+        AdapterCommand::Doctor | AdapterCommand::Status { .. } => args.push("--status".into()),
+        AdapterCommand::PlanActivate { file, name, .. } => {
+            args.push("--file".into());
+            args.push(abs(file)?);
+            push_flag_name(&mut args, name.as_deref());
+        }
+        AdapterCommand::Activate {
+            file,
+            name,
+            expected_preview_token,
+            ..
+        } => {
+            args.push("--file".into());
+            args.push(abs(file)?);
+            push_flag_name(&mut args, name.as_deref());
+            token = Some(expected_preview_token.as_deref());
+            preview = false;
+        }
+        AdapterCommand::PlanDeactivate { .. } => args.push("--uninstall".into()),
+        AdapterCommand::Deactivate {
+            expected_preview_token,
+            ..
+        } => {
+            args.push("--uninstall".into());
+            token = Some(expected_preview_token.as_deref());
+            preview = false;
+        }
+        AdapterCommand::Recover {
+            execute,
+            expected_preview_token,
+            ..
+        } => {
+            args.push("--recover".into());
+            if *execute {
+                token = Some(expected_preview_token.as_deref());
+                preview = false;
+            }
+        }
+        AdapterCommand::Backups { .. } | AdapterCommand::Restore { .. } => {
+            return Err(Error::unavailable(
+                "backups and restore are Claude commands",
+            ));
+        }
+        AdapterCommand::Reconcile { .. } => {
+            return Err(Error::unavailable("reconcile is a Grok command"));
+        }
+    }
+    args.push("--pi-dir".into());
+    args.push(pi_dir(home)?);
+    if matches!(command, AdapterCommand::PlanActivate { .. }) {
+        args.push("--dry-run".into());
+    }
+    if let Some(token) = token {
+        push_preview_token(&mut args, token, "pi")?;
+        args.push("--yes".into());
+    }
+    args.push("--json".into());
+    args.push("--lang".into());
+    args.push("en".into());
+    Ok(PreparedCommand { args, preview })
+}
+
+/// `<home>/.pi/agent`, from the isolated home when there is one, else the real home.
+fn pi_dir(home: Option<&Path>) -> Result<String> {
+    let root = match tool_dir(home, ".pi") {
+        Some(dir) => PathBuf::from(dir),
+        None => dirs::home_dir()
+            .ok_or_else(|| Error::invalid("pi needs a home folder to find ~/.pi/agent"))?
+            .join(".pi"),
+    };
+    let dir = root.join("agent");
+    if !dir.is_absolute() {
+        return Err(Error::invalid("pi --pi-dir must be an absolute path"));
+    }
+    Ok(dir.to_string_lossy().into_owned())
 }
 
 fn push_project_dir(

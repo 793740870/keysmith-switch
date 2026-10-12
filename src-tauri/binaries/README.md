@@ -5,6 +5,7 @@ keysmith-claude-<target-triple>
 keysmith-codex-<target-triple>
 keysmith-grok-<target-triple>
 keysmith-zcode-<target-triple>
+keysmith-pi-<target-triple>
 ```
 
 They are not committed. Packaged builds copy them via Tauri `externalBin`.

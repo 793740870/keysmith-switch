@@ -28,6 +28,7 @@ describe("i18n locales", () => {
       "nav.codex",
       "nav.grok",
       "nav.zcode",
+      "nav.pi",
       "nav.settings",
       "nav.about",
       "nav.advanced",

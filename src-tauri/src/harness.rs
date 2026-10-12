@@ -37,6 +37,7 @@ pub fn harness_source(tool: ToolKind) -> HarnessSource {
         ToolKind::Codex => "Codex prompt",
         ToolKind::Grok => "Grok prompt",
         ToolKind::Zcode => "ZCode prompt",
+        ToolKind::Pi => "pi prompt",
     };
     HarnessSource { tool, title }
 }

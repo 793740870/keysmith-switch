@@ -258,13 +258,8 @@ pub async fn confirm_activate(
                         .unwrap_or_else(|| "preview reported blockers".into()),
                 ));
             }
-            if plan.tool == ToolKind::Grok {
-                preview_token = preview.confirmation_token.clone();
-                if preview_token.is_none() {
-                    return Err(Error::command_failed(
-                        "grok preview did not include a confirmation token",
-                    ));
-                }
+            if uses_preview_token(plan.tool) {
+                preview_token = Some(require_token(plan.tool, &preview)?);
             }
         }
     }
@@ -356,12 +351,18 @@ pub async fn plan_deactivate(
     .await?;
     let salvage = input.salvage_config && input.tool == ToolKind::Grok;
     // Grok keeps nothing of a deployment once its manifest and rule are gone (a cleanup of a
-    // drifted deployment leaves it so), and its uninstall refuses without them. Only Switch's
-    // own record still says active: turning off then just puts that record right.
-    let record_only = input.tool == ToolKind::Grok && nothing_deployed(&status);
+    // drifted deployment leaves it so), and its uninstall refuses without them; pi's uninstall
+    // likewise refuses with `not-installed`. Only Switch's own record still says active:
+    // turning off then just puts that record right.
+    let record_only =
+        matches!(input.tool, ToolKind::Grok | ToolKind::Pi) && nothing_deployed(&status);
     // A drifted Grok deployment whose only problem is a lost config backup can still be
     // removed when the person asks for it; the adapter checks that and refuses otherwise.
-    let drifted = !salvage && (status.status == ToolStatus::Drift || status.recovery_required);
+    // pi's recover only finishes interrupted writes; it has nothing to do for a hand-edited
+    // SYSTEM.md, so its own uninstall preview says why it refuses (a redeploy is the way out).
+    let drifted = !salvage
+        && (status.recovery_required
+            || (status.status == ToolStatus::Drift && input.tool != ToolKind::Pi));
     let mut salvage_available = false;
     if drifted && input.tool == ToolKind::Grok {
         let probe = run_adapter_with(
@@ -477,13 +478,8 @@ pub async fn confirm_deactivate(
                         .unwrap_or_else(|| "preview reported blockers".into()),
                 ));
             }
-            if plan.tool == ToolKind::Grok && !record_only {
-                preview_token = preview.confirmation_token.clone();
-                if preview_token.is_none() {
-                    return Err(Error::command_failed(
-                        "grok preview did not include a confirmation token",
-                    ));
-                }
+            if uses_preview_token(plan.tool) && !record_only {
+                preview_token = Some(require_token(plan.tool, &preview)?);
             }
         }
     }
@@ -653,13 +649,8 @@ pub async fn confirm_recover(
                         .unwrap_or_else(|| "recovery preview reported blockers".into()),
                 ));
             }
-            if plan.tool == ToolKind::Grok {
-                preview_token = preview.confirmation_token.clone();
-                if preview_token.is_none() {
-                    return Err(Error::command_failed(
-                        "grok preview did not include a confirmation token",
-                    ));
-                }
+            if uses_preview_token(plan.tool) {
+                preview_token = Some(require_token(plan.tool, &preview)?);
             }
         }
     }
@@ -810,6 +801,21 @@ pub async fn tool_status(
 
 pub async fn doctor_tool(tool: ToolKind, opts: &AdapterOptions) -> Result<Envelope> {
     run_adapter_with(tool, AdapterCommand::Doctor, opts).await
+}
+
+/// Grok and pi bind a confirmed write to the preview it was planned from.
+fn uses_preview_token(tool: ToolKind) -> bool {
+    matches!(tool, ToolKind::Grok | ToolKind::Pi)
+}
+
+/// The preview's own `confirmation_token`; never anything Switch makes up.
+fn require_token(tool: ToolKind, preview: &Envelope) -> Result<String> {
+    preview.confirmation_token.clone().ok_or_else(|| {
+        Error::command_failed(format!(
+            "{} preview did not include a confirmation token",
+            tool.as_str()
+        ))
+    })
 }
 
 /// The adapter read the agent cleanly and found no deployment of its own there.
