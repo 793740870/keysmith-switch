@@ -2,7 +2,7 @@
 
 本文件记录 `v0.1.4` 及后续版本的发布边界。应用安装包不使用 Apple Developer ID、公证或 Windows Authenticode；应用内更新仍使用独立生产密钥签名并在客户端安装前验证。
 
-当前公开稳定版为 `v0.6.5`；下一版候选为 `v0.7.0`（准备中）。以下门槛是每次发布的要求，不代表下一版候选已通过。
+当前公开稳定版为 `v0.7.0`。以下门槛是每次发布的要求，不代表下一版候选已通过。
 
 identifier：`com.jia-ethan.keysmith-switch`
 
@@ -10,7 +10,7 @@ identifier：`com.jia-ethan.keysmith-switch`
 
 | 平台 | 目标 | 发布要求 |
 | --- | --- | --- |
-| macOS Apple Silicon | `.app`、`.dmg`、`.app.tar.gz` | ad-hoc 签名，关闭 hardened runtime；app、DMG 和 updater archive 内 app 的四个 sidecar 与 `keysmith-relay` 均通过运行时 smoke |
+| macOS Apple Silicon | `.app`、`.dmg`、`.app.tar.gz` | ad-hoc 签名，关闭 hardened runtime；app、DMG 和 updater archive 内 app 的五个 Keysmith sidecar 与 `keysmith-relay` 均通过运行时 smoke |
 | Windows x64 | NSIS `currentUser` `.exe` | 无 Authenticode；构建 runner 验证状态为 `NotSigned`，并产出 updater `.sig` |
 | Linux、Intel Mac、Windows ARM64 | 不发布 | 客户端显示 unsupported，不执行安装 |
 
@@ -37,7 +37,8 @@ identifier：`com.jia-ethan.keysmith-switch`
 - `src-tauri/tauri.macos.conf.json` 使用 `signingIdentity: "-"` 和 `hardenedRuntime: false`。
 - 最终 `.app` 必须通过 `codesign --verify --deep --strict`，且为 `Signature=adhoc`、`TeamIdentifier=not set`、无 Authority。
 - 最终 `.app` 和 updater `.app.tar.gz` 解包后的 app 都运行 `scripts/verify-bundle.sh`。
-- 四个 sidecar 都必须通过架构、`--version` 和隔离 HOME 预览 smoke，不能只验证文件存在。
+- 五个 Keysmith sidecar 都必须通过架构、`--version` 和隔离 HOME 预览 smoke，不能只验证文件存在。
+- 新增 sidecar（`externalBin`）时，同时把它加进 `Jia-Ethan/keysmith-switch-releases` 的 `publish.yml` 占位列表；否则 publish 的 validate 在 Linux 编译验证器时失败（`keysmith-relay` 见该仓库 #2，`keysmith-pi` 见 #3）。
 - DMG 必须通过 `hdiutil verify`。
 
 ## Windows 门槛
@@ -69,7 +70,7 @@ identifier：`com.jia-ethan.keysmith-switch`
 
 ## 发布顺序
 
-`v0.1.4` 已接替四个独立桌面安装包；这些历史安装包不撤回，也不改成各自仓库的 Latest。当前稳定版是 `v0.6.5`；本节描述每一版的发布门槛，不沿用旧候选的验证结论。以 `vX.Y.Z` 表示待发布版本。
+`v0.1.4` 已接替四个独立桌面安装包；这些历史安装包不撤回，也不改成各自仓库的 Latest。当前稳定版是 `v0.7.0`；本节描述每一版的发布门槛，不沿用旧候选的验证结论。以 `vX.Y.Z` 表示待发布版本。
 
 1. 源仓库合并 `vX.Y.Z` 发布准备，`main` CI 通过。七处版本声明一致，tag 名必须等于 `v` 加 `package.json` 的版本。
 2. 经当次明确确认后创建 GitHub-verified annotated tag `vX.Y.Z`。
