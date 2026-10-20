@@ -81,8 +81,13 @@ assert_sidecar_previews() {
   HOME="$smoke_home" "$MACOS/keysmith-dsh" --file "$prompt" --name bundle-smoke \
     --dsh-dir "$smoke_home/.dsh" --dry-run --json --lang en >/dev/null
 
+  # The DSH home and its profiles directory are pre-created because the adapter
+  # refuses to preview a missing home. They are setup fixtures, not writes by the
+  # sidecar; only unexpected entries or profile contents indicate a mutation.
+  dsh_unexpected="$(find "$smoke_home/.dsh" -mindepth 1 -maxdepth 1 ! -name profiles -print -quit)"
+  dsh_profile_write="$(find "$smoke_home/.dsh/profiles" -mindepth 1 -print -quit)"
   if [[ -e "$smoke_home/.claude" || -e "$smoke_home/.grok" || -e "$smoke_home/.zcode-keysmith" \
-    || -n "$(ls -A "$smoke_home/.pi/agent")" || -n "$(ls -A "$smoke_home/.dsh")" ]]; then
+    || -n "$(ls -A "$smoke_home/.pi/agent")" || -n "$dsh_unexpected" || -n "$dsh_profile_write" ]]; then
     echo "sidecar preview smoke unexpectedly wrote managed configuration" >&2
     rm -rf "$smoke_home"
     exit 1
