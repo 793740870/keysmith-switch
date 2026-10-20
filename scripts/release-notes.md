@@ -1,4 +1,4 @@
-# Keysmith Switch v0.8.0
+# Keysmith Switch v0.8.1
 
 新增第六个 Agent：**DSH（DeepSeek Harness）**。可以把提示词库里的提示词部署到 DSH：先看部署计划，确认后再写入。
 
@@ -15,9 +15,9 @@
 
 ## 安装
 
-- 已安装 `v0.1.3` 及以上的版本，可以在应用内点「检查更新」升级到 `v0.8.0`，安装仍需你确认。
-- macOS Apple Silicon：`Keysmith.Switch_0.8.0_aarch64.dmg`
-- Windows x64：`Keysmith.Switch_0.8.0_x64-setup.exe`
+- 已安装 `v0.1.3` 及以上的版本，可以在应用内点「检查更新」升级到 `v0.8.1`，安装仍需你确认。
+- macOS Apple Silicon：`Keysmith.Switch_0.8.1_aarch64.dmg`
+- Windows x64：`Keysmith.Switch_0.8.1_x64-setup.exe`
 
 安装包没有使用 Apple Developer ID、公证或 Windows Authenticode。更新包用独立的生产 minisign 密钥签名，这不是平台代码签名。
 
