@@ -1135,7 +1135,8 @@ async fn dsh_fixture_contract() {
             .target_paths
             .iter()
             .any(|entry| entry.role == "instruction"
-                && entry.path.ends_with("/.dsh/AGENTS.md")
+                && std::path::Path::new(&entry.path)
+                    .ends_with(std::path::Path::new(".dsh").join("AGENTS.md"))
                 && entry.exists),
         "{:?}",
         confirmed.target_paths
@@ -1205,6 +1206,27 @@ async fn dsh_reports_drift_and_a_deploy_still_plans() {
         "{:?}",
         blocked.blockers
     );
+}
+
+#[tokio::test]
+async fn dsh_failed_deploy_does_not_claim_active() {
+    let tmp = tempfile::tempdir().unwrap();
+    let home = tmp.path().join("home");
+    std::fs::create_dir_all(&home).unwrap();
+    let file = home.join("prompt.md");
+    std::fs::write(&file, "hello dsh\n").unwrap();
+    let mut opts = opts(&home, "dsh-keysmith.py");
+    opts.extra_env
+        .insert("FIXTURE_DIR_MISSING".into(), "1".into());
+
+    let failed = run_adapter_with(ToolKind::Dsh, dsh_activate(&file), &opts)
+        .await
+        .unwrap();
+
+    assert!(!failed.ok, "{failed:?}");
+    assert_eq!(failed.exit_code, 2, "{failed:?}");
+    assert_eq!(failed.status, ToolStatus::Inactive, "{failed:?}");
+    assert!(failed.error.is_some(), "{failed:?}");
 }
 
 #[tokio::test]
