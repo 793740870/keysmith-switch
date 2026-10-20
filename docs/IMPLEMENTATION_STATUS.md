@@ -1,8 +1,8 @@
 # Keysmith Switch 实现状态
 
-更新日期：2026-10-06（Asia/Shanghai）
+更新日期：2026-10-20（Asia/Shanghai）
 
-阶段：公开稳定版为 [`v0.7.0`](https://github.com/Jia-Ethan/keysmith-switch-releases/releases/tag/v0.7.0)，含 macOS Apple Silicon 与 Windows x64 安装包。`v0.1.9`（Quick Deploy，[#28](https://github.com/Jia-Ethan/keysmith-switch/pull/28)）已于 2026-09-28 发布；`v0.2.0`（界面改版，[#30](https://github.com/Jia-Ethan/keysmith-switch/pull/30)）于 2026-09-29 发布；`v0.2.1`（反馈改为预填 issue 表单、设置图标换成齿轮，[#34](https://github.com/Jia-Ethan/keysmith-switch/pull/34)）同日发布；`v0.2.2`（显示当前生效的提示词、去掉范围选择与键盘快捷键、补全操作反馈，[#37](https://github.com/Jia-Ethan/keysmith-switch/pull/37)）于 2026-09-30 发布；`v0.2.3`（“部署中”卡片、ZCode 官方图标、授权改为 PolyForm Noncommercial 1.0.0，[#39](https://github.com/Jia-Ethan/keysmith-switch/pull/39)）同日发布。此文下方 `v0.1.3`／`v0.1.4` 的验证记录是历史记录。
+阶段：公开稳定版为 [`v0.8.1`](https://github.com/Jia-Ethan/keysmith-switch-releases/releases/tag/v0.8.1)，含 macOS Apple Silicon 与 Windows x64 安装包。`v0.1.9`（Quick Deploy，[#28](https://github.com/Jia-Ethan/keysmith-switch/pull/28)）已于 2026-09-28 发布；`v0.2.0`（界面改版，[#30](https://github.com/Jia-Ethan/keysmith-switch/pull/30)）于 2026-09-29 发布；`v0.2.1`（反馈改为预填 issue 表单、设置图标换成齿轮，[#34](https://github.com/Jia-Ethan/keysmith-switch/pull/34)）同日发布；`v0.2.2`（显示当前生效的提示词、去掉范围选择与键盘快捷键、补全操作反馈，[#37](https://github.com/Jia-Ethan/keysmith-switch/pull/37)）于 2026-09-30 发布；`v0.2.3`（“部署中”卡片、ZCode 官方图标、授权改为 PolyForm Noncommercial 1.0.0，[#39](https://github.com/Jia-Ethan/keysmith-switch/pull/39)）同日发布。此文下方 `v0.1.3`／`v0.1.4` 的验证记录是历史记录。
 
 ## 产品状态
 
@@ -15,6 +15,13 @@
 - 更新安装必须显式确认；安装期间阻止关闭和重复提交，并显示下载/安装进度。
 - 六个 Keysmith sidecar 仍随应用原子交付（pi 自 [#143](https://github.com/Jia-Ethan/keysmith-switch/issues/143) 起接入，pi-keysmith 0.2.0；DSH 对应 [#148](https://github.com/Jia-Ethan/keysmith-switch/issues/148)，dsh-keysmith 0.2.2），GUI 不直接改写托管配置。
 - 当前界面基线使用 16px 正文、15px 主要控件与编辑器、分层圆角；窄窗口导航通过可点击的 More 菜单收纳，macOS 菜单栏使用单色 template icon，窗口内品牌图标仍保留颜色。
+
+## v0.8.1 发布记录
+
+- GitHub-verified annotated tag [`v0.8.1`](https://github.com/Jia-Ethan/keysmith-switch/releases/tag/v0.8.1) 指向源码 commit `39d37dc39d20d6d34e2c35684c2a7c66c95eb519`；source release run [`39435809911`](https://github.com/Jia-Ethan/keysmith-switch/actions/runs/39435809911) 的 source-gates、Windows 和 macOS 均成功。
+- 公开发布 run [`39439791542`](https://github.com/Jia-Ethan/keysmith-switch-releases/actions/runs/39439791542) 在 `production` 审批后成功；公开 Release 为 stable、非 draft、immutable。
+- 8 个公开资产（DMG、updater archive、Windows installer、两份签名、`latest.json`、provenance 和 `SHA256SUMS.txt`）已重新下载并通过 checksum、生产 updater 签名和公开 feed 校验。
+- 这版新增 DSH（DeepSeek Harness）；发布校验脚本补齐了 DSH verifier sidecar 占位（发布仓库 commit `835db5f`）。
 
 ## v0.1.3 bootstrap
 
@@ -76,13 +83,13 @@ GitHub-verified annotated tag `v0.1.3` 指向发布源码 commit。source releas
 
 ## 发布后剩余验收
 
-- Windows x64 实体机完成 `v0.1.3` 手动安装、启动和卸载验收。
-- `v0.1.3 → 后续正式版本` 的真实应用内下载、安装与重启验收；`v0.1.4-rc.1` 构建链验证不能代替该项。
+- Windows x64 实体机完成 `v0.8.1` 手动安装、启动和卸载验收。
+- `v0.7.0 → v0.8.1` 的真实应用内下载、安装与重启验收；源码和公开发布链验证不能代替该项。
 
 ## 明确未做
 
-- 尚未完成 Windows 实体机验收。
-- 尚未验证 `v0.1.3 → v0.1.4-rc.1` 的真实应用内升级与重启。
+- 尚未完成 `v0.8.1` Windows 实体机验收。
+- 尚未验证 `v0.7.0 → v0.8.1` 的真实应用内升级与重启。
 
 ## 本机 bootstrap 验收
 

@@ -2,7 +2,7 @@
 
 本文件记录 `v0.1.4` 及后续版本的发布边界。应用安装包不使用 Apple Developer ID、公证或 Windows Authenticode；应用内更新仍使用独立生产密钥签名并在客户端安装前验证。
 
-当前公开稳定版为 `v0.7.0`；下一版候选为 `v0.8.1`（准备中）。以下门槛是每次发布的要求，不代表下一版候选已通过。
+当前公开稳定版为 [`v0.8.1`](https://github.com/Jia-Ethan/keysmith-switch-releases/releases/tag/v0.8.1)；以下门槛是每次发布的要求。
 
 identifier：`com.jia-ethan.keysmith-switch`
 
@@ -13,6 +13,12 @@ identifier：`com.jia-ethan.keysmith-switch`
 | macOS Apple Silicon | `.app`、`.dmg`、`.app.tar.gz` | ad-hoc 签名，关闭 hardened runtime；app、DMG 和 updater archive 内 app 的六个 Keysmith sidecar 与 `keysmith-relay` 均通过运行时 smoke |
 | Windows x64 | NSIS `currentUser` `.exe` | 无 Authenticode；构建 runner 验证状态为 `NotSigned`，并产出 updater `.sig` |
 | Linux、Intel Mac、Windows ARM64 | 不发布 | 客户端显示 unsupported，不执行安装 |
+
+## v0.8.1 发布记录
+
+- 源码 GitHub-verified annotated tag `v0.8.1` 指向 `39d37dc39d20d6d34e2c35684c2a7c66c95eb519`；source release run `39435809911` 成功完成 source-gates、Windows 和 macOS 构建验证。
+- 公开发布 run `39439791542` 经 `production` 审批后成功，Release 为 stable、非 draft、immutable。
+- 公开资产、`latest.json`、provenance、SHA-256 和两份 updater 签名均已通过发布工作流和公开下载复核；DSH verifier sidecar 占位修复在发布仓库 commit `835db5f`。
 
 ## v0.1.3 bootstrap 边界
 
@@ -70,7 +76,7 @@ identifier：`com.jia-ethan.keysmith-switch`
 
 ## 发布顺序
 
-`v0.1.4` 已接替四个独立桌面安装包；这些历史安装包不撤回，也不改成各自仓库的 Latest。当前稳定版是 `v0.7.0`，下一版候选是 `v0.8.1`；本节描述每一版的发布门槛，不沿用旧候选的验证结论。以 `vX.Y.Z` 表示待发布版本。
+`v0.1.4` 已接替四个独立桌面安装包；这些历史安装包不撤回，也不改成各自仓库的 Latest。当前稳定版是 `v0.8.1`；本节描述每一版的发布门槛。以 `vX.Y.Z` 表示待发布版本。
 
 1. 源仓库合并 `vX.Y.Z` 发布准备，`main` CI 通过。七处版本声明一致，tag 名必须等于 `v` 加 `package.json` 的版本。
 2. 经当次明确确认后创建 GitHub-verified annotated tag `vX.Y.Z`。
@@ -83,4 +89,4 @@ identifier：`com.jia-ethan.keysmith-switch`
 9. 真实应用内下载、安装与重启，以及 Windows x64 实体机的手动安装、启动和卸载，仍须独立验收，不由源码准备或旧版构建记录代替。
 10. 公开 Release 发布后，按 README「开发」一节的「官网」检查官网是否需要同步本版改动；需要的话在 [`Jia-Ethan/keysmith-switch-site`](https://github.com/Jia-Ethan/keysmith-switch-site) 开 PR。
 
-创建 tag、触发 workflow、批准 production 或创建公开 Release 均属于外部发布动作，需要各阶段明确确认。本次准备不执行这些动作。
+创建 tag、触发 workflow、批准 production 或创建公开 Release 均属于外部发布动作，需要各阶段明确确认；`v0.8.1` 的这些动作已完成并有上方运行记录。下一版仍须按本流程逐阶段确认。
