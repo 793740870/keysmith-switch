@@ -637,6 +637,19 @@ fn normalize_dsh(
             role: "config-root".into(),
             exists: dir_exists,
         });
+        // dsh reports the prompt in the manifest as a relative resource name;
+        // expose the resolved live file so harness adoption can verify its hash.
+        let prompt_path = json
+            .pointer("/manifest/resources/agents_md/path")
+            .and_then(Value::as_str)
+            .map(std::path::PathBuf::from)
+            .filter(|path| path.is_absolute())
+            .unwrap_or_else(|| std::path::Path::new(dir).join("AGENTS.md"));
+        envelope.target_paths.push(TargetPath {
+            path: prompt_path.to_string_lossy().into_owned(),
+            role: "instruction".into(),
+            exists: prompt_path.is_file(),
+        });
     }
 
     // dsh-keysmith's own messages are English regardless of `--lang`, so they are passed
@@ -705,11 +718,11 @@ fn normalize_dsh(
             .pointer("/adapter_patch/path")
             .and_then(Value::as_str)
             .unwrap_or("");
-        if adapter_path.is_empty() {
+        if !adapter_path.is_empty() {
             envelope.target_paths.push(TargetPath {
                 path: adapter_path.to_string(),
                 role: "adapter".into(),
-                exists: false,
+                exists: !matches!(adapter_state, "absent"),
             });
         }
         if matches!(adapter_state, "unknown" | "absent") {

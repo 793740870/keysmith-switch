@@ -1130,6 +1130,16 @@ async fn dsh_fixture_contract() {
         "the manifest's deployed-prompt sha is what names the live prompt"
     );
     assert!(dsh_dir.join("AGENTS.md").is_file());
+    assert!(
+        confirmed
+            .target_paths
+            .iter()
+            .any(|entry| entry.role == "instruction"
+                && entry.path.ends_with("/.dsh/AGENTS.md")
+                && entry.exists),
+        "{:?}",
+        confirmed.target_paths
+    );
 
     let active = run_adapter_with(ToolKind::Dsh, dsh_status(), &opts)
         .await
