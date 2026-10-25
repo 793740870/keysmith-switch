@@ -100,11 +100,15 @@ SPECS = [
         "hidden": [],
     },
     {
-        # dsh-keysmith keeps its built-in prompt as a source constant and reads no data
-        # files, so there is nothing to bundle alongside it.
+        # 0.4.0 copies plugin/ into the profile. Frozen builds must ship that
+        # tree plus examples/dsh-unrestricted.md next to the CLI.
         "name": "keysmith-dsh",
         "script": VENDOR / "dsh" / "dsh-keysmith.py",
-        "datas": [],
+        "datas": [
+            (VENDOR / "dsh" / "plugin", "plugin"),
+            VENDOR / "dsh" / "examples" / "dsh-unrestricted.md",
+        ],
+        "must_contain": ["plugin/lib/index.js", "plugin/lib/contract.md"],
         "hidden": [],
     },
 ]
@@ -131,7 +135,8 @@ def assert_bundled(python: Path, binary: Path, required: list) -> None:
         capture_output=True,
         text=True,
     ).stdout.splitlines()
-    entries = {line.strip() for line in listing}
+    # Windows builds store archive names with backslashes (`plugin\lib\index.js`).
+    entries = {line.strip().replace("\\", "/") for line in listing}
     missing = [name for name in required if name not in entries]
     if missing:
         raise SystemExit(f"{binary.name} does not bundle {missing}; the adapter reads these when it runs")
@@ -165,8 +170,9 @@ def build_one(python: Path, spec: dict, triple: str) -> Path:
     ]
     for data in spec.get("datas") or []:
         src, dest = data if isinstance(data, tuple) else (data, "examples")
-        if Path(src).is_file():
-            cmd.extend(["--add-data", add_data_arg(Path(src), dest)])
+        src_path = Path(src)
+        if src_path.is_file() or src_path.is_dir():
+            cmd.extend(["--add-data", add_data_arg(src_path, dest)])
     for hidden in spec.get("hidden") or []:
         cmd.extend(["--hidden-import", hidden])
     for extra in spec.get("paths") or []:
